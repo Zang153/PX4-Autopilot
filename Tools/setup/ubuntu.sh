@@ -98,6 +98,7 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get -y --quiet --no-install-recommends i
 	python3 \
 	python3-dev \
 	python3-pip \
+	python3-venv \
 	python3-setuptools \
 	python3-wheel \
 	rsync \

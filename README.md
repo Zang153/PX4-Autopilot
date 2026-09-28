@@ -91,6 +91,10 @@ make px4_sitl
 > [!NOTE]
 > See the [Development Guide](https://docs.px4.io/main/en/development/development.html) for toolchain setup and build options.
 
+For this fork's repository-local Python build environment, see
+Tools/setup/README.md. The PX4 .venv is separate from the ROS/Torch
+environment in the companion uav_ws repository.
+
 ## Documentation & Resources
 
 | Resource | Description |

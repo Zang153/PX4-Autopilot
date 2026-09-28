@@ -100,15 +100,7 @@ echo "[macos.sh] Installing Python3 dependencies"
 ROOT_DIR="$(git -C "$DIR" rev-parse --show-toplevel 2>/dev/null || echo "$DIR")"
 VENV_DIR="$ROOT_DIR/.venv"
 
-# Create virtual environment if it doesn't exist
-if [ ! -d "$VENV_DIR" ]; then
-	echo "[macos.sh] Creating Python virtual environment at $VENV_DIR"
-	python3 -m venv "$VENV_DIR"
-fi
-
-# We need to have future to install pymavlink later.
-"$VENV_DIR/bin/pip" install future
-"$VENV_DIR/bin/pip" install -r "${DIR}/requirements.txt"
+"$DIR/setup-venv"
 
 # Optional, but recommended additional simulation tools:
 if [[ $INSTALL_SIM == "--sim-tools" ]]; then
