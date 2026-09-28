@@ -419,7 +419,11 @@ void Raptor::updateArmingCheckReply()
 		if (_arming_check_request_sub.updated()) {
 			arming_check_request_s arming_check_request;
 			_arming_check_request_sub.copy(&arming_check_request);
-			arming_check_reply_s arming_check_reply;
+			// Initialize the complete reply before assigning individual fields.
+			// The relaxed position requirements are part of the uORB message and
+			// must not contain indeterminate stack values: Commander uses them to
+			// decide whether this External Mode is valid.
+			arming_check_reply_s arming_check_reply{};
 			arming_check_reply.timestamp = hrt_absolute_time();
 			arming_check_reply.request_id = arming_check_request.request_id;
 			arming_check_reply.registration_id = ext_component_arming_check_id;
@@ -430,9 +434,11 @@ void Raptor::updateArmingCheckReply()
 			arming_check_reply.mode_req_local_position = true;
 			arming_check_reply.mode_req_attitude = true;
 			arming_check_reply.mode_req_local_alt = true;
+			arming_check_reply.mode_req_local_position_relaxed = false;
 			arming_check_reply.mode_req_home_position = false;
 			arming_check_reply.mode_req_mission = false;
 			arming_check_reply.mode_req_global_position = false;
+			arming_check_reply.mode_req_global_position_relaxed = false;
 			arming_check_reply.mode_req_prevent_arming = false;
 			arming_check_reply.mode_req_manual_control = false;
 			_arming_check_reply_pub.publish(arming_check_reply);
@@ -891,6 +897,15 @@ void Raptor::Run()
 
 	if (status.active) {
 		_actuator_motors_pub.publish(actuator_motors);
+
+		if (_param_raptor_timing.get()) {
+			raptor_timing_s timing{};
+			timing.timestamp = hrt_absolute_time();
+			timing.timestamp_sample = actuator_motors.timestamp_sample;
+			timing.actuator_timestamp = actuator_motors.timestamp;
+			timing.stage = raptor_timing_s::STAGE_NATIVE_COMMAND;
+			_raptor_timing_pub.publish(timing);
+		}
 	}
 
 	perf_end(_loop_perf);

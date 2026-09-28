@@ -16,7 +16,7 @@ publications:
 
   - topic: /fmu/out/mode_completed
     type: px4_msgs::msg::ModeCompleted
-    rate_limit: 50.
+    rate_limit: 5.
 
   - topic: /fmu/out/battery_status
     type: px4_msgs::msg::BatteryStatus
@@ -24,7 +24,7 @@ publications:
 
   - topic: /fmu/out/collision_constraints
     type: px4_msgs::msg::CollisionConstraints
-    rate_limit: 50.
+    rate_limit: 5.
 
   - topic: /fmu/out/estimator_status_flags
     type: px4_msgs::msg::EstimatorStatusFlags
@@ -34,9 +34,11 @@ publications:
     type: px4_msgs::msg::FailsafeFlags
     rate_limit: 5.
 
-  - topic: /fmu/out/manual_control_setpoint
-    type: px4_msgs::msg::ManualControlSetpoint
-    rate_limit: 25.
+  # manual_control_setpoint removed: no workspace subscriber. RC handling
+  # remains inside PX4 and is unaffected by this DDS publication.
+  # - topic: /fmu/out/manual_control_setpoint
+  #   type: px4_msgs::msg::ManualControlSetpoint
+  #   rate_limit: 25.
 
   - topic: /fmu/out/message_format_response
     type: px4_msgs::msg::MessageFormatResponse
@@ -45,8 +47,9 @@ publications:
     type: px4_msgs::msg::PositionSetpointTriplet
     rate_limit: 5.
 
-  - topic: /fmu/out/sensor_combined
-    type: px4_msgs::msg::SensorCombined
+  # sensor_combined removed: no workspace subscriber, frees serial bandwidth
+  # - topic: /fmu/out/sensor_combined
+  #   type: px4_msgs::msg::SensorCombined
 
   - topic: /fmu/out/timesync_status
     type: px4_msgs::msg::TimesyncStatus
@@ -55,16 +58,18 @@ publications:
   - topic: /fmu/out/transponder_report
     type: px4_msgs::msg::TransponderReport
 
-  # - topic: /fmu/out/vehicle_angular_velocity
-  #   type: px4_msgs::msg::VehicleAngularVelocity
+  - topic: /fmu/out/vehicle_angular_velocity
+    type: px4_msgs::msg::VehicleAngularVelocity
+    rate_limit: 0
 
   - topic: /fmu/out/vehicle_land_detected
     type: px4_msgs::msg::VehicleLandDetected
     rate_limit: 5.
 
+  # Independent attitude input for companion policies.
   - topic: /fmu/out/vehicle_attitude
     type: px4_msgs::msg::VehicleAttitude
-    rate_limit: 50.
+    rate_limit: 0
 
   - topic: /fmu/out/vehicle_control_mode
     type: px4_msgs::msg::VehicleControlMode
@@ -73,13 +78,15 @@ publications:
   - topic: /fmu/out/vehicle_command_ack
     type: px4_msgs::msg::VehicleCommandAck
 
-  - topic: /fmu/out/vehicle_global_position
-    type: px4_msgs::msg::VehicleGlobalPosition
-    rate_limit: 50.
+  # vehicle_global_position removed: no workspace subscriber.
+  # - topic: /fmu/out/vehicle_global_position
+  #   type: px4_msgs::msg::VehicleGlobalPosition
+  #   rate_limit: 5.
 
-  - topic: /fmu/out/vehicle_gps_position
-    type: px4_msgs::msg::SensorGps
-    rate_limit: 50.
+  # vehicle_gps_position removed: no workspace subscriber.
+  # - topic: /fmu/out/vehicle_gps_position
+  #   type: px4_msgs::msg::SensorGps
+  #   rate_limit: 5.
 
   - topic: /fmu/out/vehicle_local_position
     type: px4_msgs::msg::VehicleLocalPosition
@@ -89,13 +96,20 @@ publications:
     type: px4_msgs::msg::VehicleOdometry
     rate_limit: 100.
 
+  # actuator_motors echo removed: /fmu/out == /fmu/in (99% identical, offboard
+  # direct_actuator bypasses mixing), frees 24 KB/s serial bandwidth
+  # - topic: /fmu/out/actuator_motors
+  #   type: px4_msgs::msg::ActuatorMotors
+  #   rate_limit: 400.
+
   - topic: /fmu/out/vehicle_status
     type: px4_msgs::msg::VehicleStatus
     rate_limit: 5.
 
-  - topic: /fmu/out/airspeed_validated
-    type: px4_msgs::msg::AirspeedValidated
-    rate_limit: 50.
+  # airspeed_validated removed: no workspace subscriber.
+  # - topic: /fmu/out/airspeed_validated
+  #   type: px4_msgs::msg::AirspeedValidated
+  #   rate_limit: 50.
 
   - topic: /fmu/out/vtol_vehicle_status
     type: px4_msgs::msg::VtolVehicleStatus
@@ -119,9 +133,11 @@ publications:
     type: px4_msgs::msg::Vtx
     rate_limit: 1.
 
-  - topic: /fmu/out/input_rc
-    type: px4_msgs::msg::InputRc
-    rate_limit: 10.
+  # input_rc removed: no workspace subscriber. RC input and mode switching
+  # remain handled internally by PX4.
+  # - topic: /fmu/out/input_rc
+  #   type: px4_msgs::msg::InputRc
+  #   rate_limit: 10.
 
 # Create uORB::Publication
 subscriptions:

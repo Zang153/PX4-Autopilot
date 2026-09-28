@@ -35,7 +35,10 @@
 
 #include "FunctionProviderBase.hpp"
 
+#include <parameters/param.h>
+#include <uORB/PublicationMulti.hpp>
 #include <uORB/topics/actuator_motors.h>
+#include <uORB/topics/raptor_timing.h>
 
 /**
  * Functions: Motor1 ... MotorMax
@@ -63,6 +66,15 @@ public:
 	{
 		if (_topic.update(&_data)) {
 			updateValues(_data.reversible_flags, _thrust_factor, _data.control, actuator_motors_s::NUM_CONTROLS);
+
+			if (timingTraceEnabled()) {
+				raptor_timing_s timing{};
+				timing.timestamp = hrt_absolute_time();
+				timing.timestamp_sample = _data.timestamp_sample;
+				timing.actuator_timestamp = _data.timestamp;
+				timing.stage = raptor_timing_s::STAGE_INPUT_CONSUMED;
+				_raptor_timing_pub.publish(timing);
+			}
 		}
 	}
 
@@ -77,6 +89,8 @@ public:
 	uORB::SubscriptionCallbackWorkItem *subscriptionCallback() override { return &_topic; }
 
 	bool getLatestSampleTimestamp(hrt_abstime &t) const override { t = _data.timestamp_sample; return t != 0; }
+
+	bool getLatestActuatorTimestamp(hrt_abstime &t) const override { t = _data.timestamp; return t != 0; }
 
 	static inline void updateValues(uint32_t reversible, float thrust_factor, float *values, int num_values)
 	{
@@ -122,7 +136,19 @@ public:
 	bool reversible(OutputFunction func) const override { return _data.reversible_flags & (1u << ((int)func - (int)OutputFunction::Motor1)); }
 
 private:
+	bool timingTraceEnabled()
+	{
+		if (_raptor_timing_param == PARAM_INVALID) {
+			_raptor_timing_param = param_find("RAP_TIMING");
+		}
+
+		int32_t enabled = 0;
+		return _raptor_timing_param != PARAM_INVALID && param_get(_raptor_timing_param, &enabled) == 0 && enabled != 0;
+	}
+
 	uORB::SubscriptionCallbackWorkItem _topic;
+	uORB::PublicationMulti<raptor_timing_s> _raptor_timing_pub{ORB_ID(raptor_timing)};
 	actuator_motors_s _data{};
 	const float &_thrust_factor;
+	param_t _raptor_timing_param{PARAM_INVALID};
 };

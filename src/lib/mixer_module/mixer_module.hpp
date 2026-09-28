@@ -49,6 +49,7 @@
 #include "functions/FunctionServos.hpp"
 
 #include <board_config.h>
+#include <parameters/param.h>
 #include <drivers/drv_pwm_output.h>
 #include <lib/perf/perf_counter.h>
 #include <px4_platform_common/module_params.h>
@@ -60,6 +61,7 @@
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/actuator_outputs.h>
 #include <uORB/topics/parameter_update.h>
+#include <uORB/topics/raptor_timing.h>
 
 using namespace time_literals;
 
@@ -220,6 +222,7 @@ private:
 	void setAndPublishActuatorOutputs(unsigned num_outputs, actuator_outputs_s &actuator_outputs);
 	void publishMixerStatus(const actuator_outputs_s &actuator_outputs);
 	void updateLatencyPerfCounter(const actuator_outputs_s &actuator_outputs);
+	bool timingTraceEnabled();
 
 	void cleanupFunctions();
 
@@ -263,6 +266,7 @@ private:
 	uORB::Subscription _armed_sub{ORB_ID(actuator_armed)};
 
 	uORB::PublicationMulti<actuator_outputs_s> _outputs_pub{ORB_ID(actuator_outputs)};
+	uORB::PublicationMulti<raptor_timing_s> _raptor_timing_pub{ORB_ID(raptor_timing)};
 
 	actuator_armed_s _armed{};
 
@@ -289,6 +293,7 @@ private:
 	const char *const _param_prefix;
 	ParamHandles _param_handles[MAX_ACTUATORS];
 	param_t _param_handle_rev_range{PARAM_INVALID};
+	param_t _raptor_timing_param{PARAM_INVALID};
 	hrt_abstime _lowrate_schedule_interval{300_ms};
 	ActuatorTest _actuator_test{_function_assignment};
 	uint32_t _reversible_mask{0}; ///< per-output bits. If set, the output is configured to be reversible (motors only)

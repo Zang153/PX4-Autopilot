@@ -193,6 +193,7 @@ set(msg_files
 	RoverSteeringSetpoint.msg
 	RoverThrottleSetpoint.msg
 	Rpm.msg
+	RaptorTiming.msg
 	RtcmData.msg
 	RtlStatus.msg
 	RtlTimeEstimate.msg

@@ -12,6 +12,7 @@
 #include <lib/perf/perf_counter.h>
 
 #include <uORB/Publication.hpp>
+#include <uORB/PublicationMulti.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/vehicle_local_position.h>
@@ -19,6 +20,7 @@
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_angular_velocity.h>
 #include <uORB/topics/actuator_motors.h>
+#include <uORB/topics/raptor_timing.h>
 #include <uORB/topics/trajectory_setpoint.h>
 #include <uORB/topics/register_ext_component_request.h>
 #include <uORB/topics/register_ext_component_reply.h>
@@ -153,6 +155,7 @@ private:
 	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
 	uORB::SubscriptionCallbackWorkItem _vehicle_angular_velocity_sub{this, ORB_ID(vehicle_angular_velocity)};
 	uORB::Publication<actuator_motors_s> _actuator_motors_pub{ORB_ID(actuator_motors)};
+	uORB::PublicationMulti<raptor_timing_s> _raptor_timing_pub{ORB_ID(raptor_timing)};
 	uORB::Publication<raptor_status_s> _raptor_status_pub{ORB_ID(raptor_status)};
 	uORB::Publication<raptor_input_s> _raptor_input_pub{ORB_ID(raptor_input)};
 	uORB::Publication<tune_control_s> _tune_control_pub{ORB_ID(tune_control)};
@@ -277,7 +280,8 @@ private:
 	DEFINE_PARAMETERS(
 		(ParamInt<px4::params::IMU_GYRO_RATEMAX>) _param_imu_gyro_ratemax,
 		(ParamBool<px4::params::MC_RAPTOR_OFFB>) _param_mc_raptor_offboard,
-		(ParamInt<px4::params::MC_RAPTOR_INTREF>) _param_mc_raptor_intref
+		(ParamInt<px4::params::MC_RAPTOR_INTREF>) _param_mc_raptor_intref,
+		(ParamBool<px4::params::RAP_TIMING>) _param_raptor_timing
 	)
 
 

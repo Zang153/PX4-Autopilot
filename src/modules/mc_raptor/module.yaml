@@ -10,6 +10,15 @@ parameters:
             type: boolean
             default: false
             category: System
+        RAP_TIMING:
+            description:
+                short: Enable RAPTOR timing trace
+                long: |
+                    Publish low-overhead uORB timing events for RAPTOR command and actuator output latency measurements.
+                    Leave disabled during normal operation.
+            type: boolean
+            default: false
+            category: System
         MC_RAPTOR_VERBOS:
             description:
                 short: Enable verbose output

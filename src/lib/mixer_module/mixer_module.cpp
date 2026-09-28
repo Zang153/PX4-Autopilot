@@ -661,6 +661,36 @@ MixingOutput::setAndPublishActuatorOutputs(unsigned num_outputs, actuator_output
 
 	actuator_outputs.timestamp = hrt_absolute_time();
 	_outputs_pub.publish(actuator_outputs);
+
+	if (timingTraceEnabled()) {
+		hrt_abstime timestamp_sample = 0;
+		hrt_abstime actuator_timestamp = 0;
+
+		for (int i = 0; i < MAX_ACTUATORS; ++i) {
+			if (_function_allocated[i] && _function_allocated[i]->getLatestSampleTimestamp(timestamp_sample)) {
+				_function_allocated[i]->getLatestActuatorTimestamp(actuator_timestamp);
+				break;
+			}
+		}
+
+		raptor_timing_s timing{};
+		timing.timestamp = actuator_outputs.timestamp;
+		timing.timestamp_sample = timestamp_sample;
+		timing.actuator_timestamp = actuator_timestamp;
+		timing.stage = raptor_timing_s::STAGE_OUTPUT_PUBLISHED;
+		_raptor_timing_pub.publish(timing);
+	}
+}
+
+bool
+MixingOutput::timingTraceEnabled()
+{
+	if (_raptor_timing_param == PARAM_INVALID) {
+		_raptor_timing_param = param_find("RAP_TIMING");
+	}
+
+	int32_t enabled = 0;
+	return _raptor_timing_param != PARAM_INVALID && param_get(_raptor_timing_param, &enabled) == 0 && enabled != 0;
 }
 
 void

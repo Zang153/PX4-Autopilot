@@ -68,6 +68,8 @@ public:
 
 	virtual bool getLatestSampleTimestamp(hrt_abstime &t) const { return false; }
 
+	virtual bool getLatestActuatorTimestamp(hrt_abstime &t) const { return false; }
+
 	/**
 	 * Check whether the output (motor) is configured to be reversible
 	 */
