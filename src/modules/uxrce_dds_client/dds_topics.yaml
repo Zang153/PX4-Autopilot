@@ -45,6 +45,12 @@ publications:
     type: px4_msgs::msg::PositionSetpointTriplet
     rate_limit: 5.
 
+  # Direct driver acceleration (board FRD); companion applies fixed calibration.
+  # Omitted instance selects uORB instance 0 without a DDS topic suffix.
+  - topic: /fmu/out/sensor_accel
+    type: px4_msgs::msg::SensorAccel
+    rate_limit: 0
+
   - topic: /fmu/out/sensor_combined
     type: px4_msgs::msg::SensorCombined
 
