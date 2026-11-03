@@ -36,6 +36,7 @@ class SelectiveDeltaCollisionSystem : public gz::sim::System,
   bool announced{false};
   double nextSample{0};
   std::map<std::string, std::pair<gz::math::Vector3d,gz::math::Vector3d>> upperAnchors;
+  std::map<std::string, gz::math::Vector3d> closurePlatformAnchors;
   gz::math::Vector2d guideXY{0,0}; bool guideSet{false};
   const std::map<std::string, std::string> uppers{
     {"delta2_lower_arm_4", "delta_elbow_2"},
@@ -45,8 +46,10 @@ class SelectiveDeltaCollisionSystem : public gz::sim::System,
     {"delta_lower_arm_5", "delta_elbow_3"},
     {"delta_lower_arm_6", "delta_elbow_3"}};
   const std::map<std::string, gz::math::Vector3d> upperAnchorModel{
-    {"delta2_lower_arm_4",{0.1745,-0.0262,0}}, {"delta2_lower_arm_5",{0.1745,0.0262,0}},
-    {"delta1_lower_arm_1",{0.1745,0.0262,0}}, {"delta1_lower_arm_2",{0.1745,-0.0262,0}},
+    {"delta2_lower_arm_4",{-0.0645601344,0.1642214330,0}},
+    {"delta2_lower_arm_5",{-0.1099398656,0.1380214330,0}},
+    {"delta1_lower_arm_1",{-0.0645601344,-0.1642214330,0}},
+    {"delta1_lower_arm_2",{-0.1099398656,-0.1380214330,0}},
     {"delta_lower_arm_5",{0.1745,0.0262,0}}, {"delta_lower_arm_6",{0.1745,-0.0262,0}}};
 public:
   void Configure(const gz::sim::Entity &entity,
@@ -187,10 +190,15 @@ public:
     if (t < nextSample) return;
     nextSample = t + 0.01;
     double closure = 0, upper = 0;
+    const auto platformPose = worldPose(links.at("delta_end_platform"),ecm);
     for (int i=1; i<=5; ++i) {
       auto prefix = "c" + std::to_string(i);
-      closure = std::max(closure, (worldPose(links.at(prefix+"_z"),ecm).Pos()
-        - worldPose(links.at(prefix+"_dummy"),ecm).Pos()).Length());
+      const auto helperPose = worldPose(links.at(prefix+"_dummy"),ecm);
+      if (!closurePlatformAnchors.count(prefix)) {
+        closurePlatformAnchors[prefix] = platformPose.Inverse().CoordPositionAdd(helperPose.Pos());
+      }
+      closure = std::max(closure, (platformPose.CoordPositionAdd(
+        closurePlatformAnchors.at(prefix)) - helperPose.Pos()).Length());
     }
     for (const auto &[child,parent] : uppers) {
       const auto cp = worldPose(links.at(child),ecm);
