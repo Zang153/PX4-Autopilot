@@ -158,12 +158,10 @@ int LockstepScheduler::cond_timedwait(pthread_cond_t *cond, pthread_mutex_t *loc
 
 	timed_wait.done = true;
 
-	if (!timeout && _setting_time) {
-		// This is where it gets tricky: the timeout has not been triggered yet,
-		// and another thread is in set_absolute_time().
-		// If it already passed the 'done' check, it will access the mutex and
-		// the condition variable next. However they might be invalid as soon as we
-		// return here, so we wait until set_absolute_time() is done.
+	if (_setting_time) {
+		// Another thread is in set_absolute_time() and may still access the
+		// caller's stack-local mutex and condition variable after this wakeup.
+		// Do not let those objects go out of scope before the broadcast completes.
 		// In addition we have to unlock 'lock', otherwise we risk a
 		// deadlock due to a different locking order in set_absolute_time().
 		// Note that this case does not happen too frequently, and thus can be
