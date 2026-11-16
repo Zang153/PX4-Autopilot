@@ -1,0 +1,13 @@
+menuconfig MODULES_MC_UAV_DELTA
+	bool "mc_uav_delta"
+	default n
+	depends on LIB_RL_TOOLS
+	---help---
+		Enable the UAV Delta recurrent controller with raw three-dimensional joint feedback.
+
+menuconfig USER_MC_UAV_DELTA
+	bool "mc_uav_delta running as userspace module"
+	default n
+	depends on BOARD_PROTECTED && MODULES_MC_UAV_DELTA
+	---help---
+		Put mc_uav_delta in userspace memory

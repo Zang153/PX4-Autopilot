@@ -1,0 +1,33 @@
+module_name: mc_uav_delta
+parameters:
+    - group: Multicopter UAV Delta
+      definitions:
+        MC_UAVD_ENABLE:
+            description:
+                short: Enable UAV Delta flight mode
+                long: |
+                    Start the UAV Delta controller at boot. The controller uses the RAPTOR 22D observation followed by three raw Delta joint angles.
+            type: boolean
+            default: false
+            category: System
+        MC_UAVD_GYRO_HZ:
+            description:
+                short: Override the angular velocity sample rate
+                long: |
+                    Angular velocity sample rate used for recurrent scheduling. Set to 0 to use IMU_GYRO_RATEMAX. Set explicitly when the actual stream differs from the PX4 parameter, for example 500 Hz in Gazebo. The effective rate must be an integer multiple of 100 Hz.
+            type: int32
+            default: 0
+            min: 0
+            max: 2000
+            category: System
+        MC_UAVD_Q_MAXAGE:
+            description:
+                short: Maximum Delta joint feedback age
+                long: |
+                    Maximum allowed age of the latest valid delta_arm_state sample in milliseconds. Missing or older feedback prevents controller activation.
+            type: int32
+            default: 100
+            min: 20
+            max: 1000
+            unit: ms
+            category: System

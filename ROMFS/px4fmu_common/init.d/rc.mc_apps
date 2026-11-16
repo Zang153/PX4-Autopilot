@@ -56,3 +56,8 @@ if param compare -s MC_RAPTOR_ENABLE 1
 then
 	mc_raptor start
 fi
+
+if param compare -s MC_UAVD_ENABLE 1
+then
+	mc_uav_delta start
+fi

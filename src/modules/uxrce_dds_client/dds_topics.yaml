@@ -169,6 +169,9 @@ subscriptions:
   - topic: /fmu/in/obstacle_distance
     type: px4_msgs::msg::ObstacleDistance
 
+  - topic: /fmu/in/delta_arm_state
+    type: px4_msgs::msg::DeltaArmState
+
   - topic: /fmu/in/sensor_optical_flow
     type: px4_msgs::msg::SensorOpticalFlow
 

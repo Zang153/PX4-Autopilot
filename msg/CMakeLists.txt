@@ -258,6 +258,7 @@ set(msg_files
 	versioned/AuxGlobalPosition.msg
 	versioned/BatteryStatus.msg
 	versioned/ConfigOverrides.msg
+	versioned/DeltaArmState.msg
 	versioned/FixedWingLateralSetpoint.msg
 	versioned/FixedWingLongitudinalSetpoint.msg
 	versioned/GotoSetpoint.msg
@@ -274,6 +275,8 @@ set(msg_files
 	versioned/SetpointConfigReply.msg
 	versioned/TrajectorySetpoint.msg
 	versioned/UnregisterExtComponent.msg
+	versioned/UavDeltaInput.msg
+	versioned/UavDeltaStatus.msg
 	versioned/VehicleAngularVelocity.msg
 	versioned/VehicleAttitude.msg
 	versioned/VehicleAttitudeSetpoint.msg
