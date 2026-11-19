@@ -79,7 +79,7 @@ check_scene_info() {
 	fi
 }
 
-ATTEMPTS=30
+ATTEMPTS="${PX4_GZ_WAIT_ATTEMPTS:-30}"
 while [ $ATTEMPTS -gt 0 ]; do
 	if check_scene_info; then
 		echo "INFO  [init] Gazebo world is ready"
