@@ -12,6 +12,13 @@ param set-default MAV_2_RATE 100000
 param set-default MAV_2_REMOTE_PRT 14550
 param set-default MAV_2_UDP_PRT 14550
 
+# Micro XRCE-DDS to the companion computer at 10.41.10.1:8888
+param set-default UXRCE_DDS_CFG 1000
+param set-default UXRCE_DDS_AG_IP 170461697
+param set-default UXRCE_DDS_PRT 8888
+param set-default UXRCE_DDS_DOM_ID 42
+param set-default UXRCE_DDS_SYNCT 1
+
 param set-default BAT1_V_DIV 31
 param set-default BAT1_A_PER_V 24
 
