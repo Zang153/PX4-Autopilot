@@ -1,0 +1,159 @@
+module_name: dxl_arm
+parameters:
+    - group: Dynamixel Arm
+      definitions:
+        DXL_ARM_ENABLE:
+            description:
+                short: Start the Dynamixel arm driver and automatic centering at boot
+            type: boolean
+            default: true
+            category: System
+        DXL_ARM_BAUD:
+            description:
+                short: Dynamixel serial baud rate
+            type: enum
+            values:
+                57600: 57600 baud
+                115200: 115200 baud
+                1000000: 1000000 baud
+            default: 57600
+            category: System
+        DXL_ID1:
+            description: {short: Servo ID for the front motor / training joint 1}
+            type: int32
+            default: 1
+            min: 1
+            max: 253
+        DXL_ID2:
+            description: {short: Servo ID for the left-rear motor / training joint 2}
+            type: int32
+            default: 2
+            min: 1
+            max: 253
+        DXL_ID3:
+            description: {short: Servo ID for the right-rear motor / training joint 3}
+            type: int32
+            default: 3
+            min: 1
+            max: 253
+        DXL_ZERO1:
+            description: {short: Raw zero count for training joint 1}
+            type: int32
+            default: 2048
+            min: 0
+            max: 4095
+        DXL_ZERO2:
+            description: {short: Raw zero count for training joint 2}
+            type: int32
+            default: 2048
+            min: 0
+            max: 4095
+        DXL_ZERO3:
+            description: {short: Raw zero count for training joint 3}
+            type: int32
+            default: 2048
+            min: 0
+            max: 4095
+        DXL_SIGN1:
+            description: {short: Raw count direction for training joint 1}
+            type: enum
+            values: {-1: Negative, 1: Positive}
+            default: 1
+        DXL_SIGN2:
+            description: {short: Raw count direction for training joint 2}
+            type: enum
+            values: {-1: Negative, 1: Positive}
+            default: 1
+        DXL_SIGN3:
+            description: {short: Raw count direction for training joint 3}
+            type: enum
+            values: {-1: Negative, 1: Positive}
+            default: 1
+        DXL_Q_MIN:
+            description: {short: Minimum command angle for all three joints}
+            type: float
+            default: -0.523599
+            min: -3.141593
+            max: 0.0
+            unit: rad
+        DXL_Q_MAX:
+            description: {short: Maximum command angle for all three joints}
+            type: float
+            default: 1.570796
+            min: 0.0
+            max: 3.141593
+            unit: rad
+        DXL_MAX_VEL:
+            description: {short: Maximum trajectory joint velocity}
+            type: float
+            default: 0.8
+            min: 0.01
+            max: 5.0
+            unit: rad/s
+        DXL_MAX_ACC:
+            description: {short: Maximum trajectory joint acceleration}
+            type: float
+            default: 2.0
+            min: 0.01
+            max: 20.0
+        DXL_RAND_AMP:
+            description: {short: Maximum absolute random target angle}
+            type: float
+            default: 0.15
+            min: 0.01
+            max: 1.5
+            unit: rad
+        DXL_CENTER_TOL:
+            description: {short: Actual-angle tolerance for completed centering}
+            type: float
+            default: 0.04
+            min: 0.005
+            max: 0.3
+            unit: rad
+        DXL_RAND_SEED:
+            description: {short: Random trajectory generator seed}
+            type: int32
+            default: 1
+            min: 1
+            max: 2147483647
+        DXL_FB_HZ:
+            description: {short: Requested complete three-servo feedback rate}
+            type: int32
+            default: 50
+            min: 5
+            max: 100
+            unit: Hz
+        DXL_CMD_HZ:
+            description: {short: Maximum goal-position write rate}
+            type: int32
+            default: 50
+            min: 5
+            max: 100
+            unit: Hz
+        DXL_RC_CENTER:
+            description: {short: RC channel for centering, 0 disables; default CH7}
+            type: int32
+            default: 7
+            min: 0
+            max: 18
+        DXL_RC_RANDOM:
+            description: {short: RC channel for random motion, 0 disables; default CH8}
+            type: int32
+            default: 8
+            min: 0
+            max: 18
+        DXL_RC_DB_MS:
+            description: {short: RC arm-command debounce time}
+            type: int32
+            default: 150
+            min: 0
+            max: 1000
+            unit: ms
+        DXL_ALLOW_ARMED:
+            description:
+                short: Allow arm motion commands while the vehicle is armed
+                long: |
+                    Automatic centering still requires valid feedback and vehicle status. Random motion requires completed centering and an explicit RC or shell command; arming alone never starts random motion.
+            type: boolean
+            default: true
+            category: System

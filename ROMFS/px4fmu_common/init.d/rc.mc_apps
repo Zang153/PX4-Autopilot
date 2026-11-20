@@ -57,6 +57,11 @@ then
 	mc_raptor start
 fi
 
+if param compare -s DXL_ARM_ENABLE 1
+then
+	dxl_arm start
+fi
+
 if param compare -s MC_UAVD_ENABLE 1
 then
 	mc_uav_delta start

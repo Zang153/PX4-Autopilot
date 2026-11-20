@@ -259,6 +259,7 @@ set(msg_files
 	versioned/BatteryStatus.msg
 	versioned/ConfigOverrides.msg
 	versioned/DeltaArmState.msg
+	versioned/DxlArmStatus.msg
 	versioned/FixedWingLateralSetpoint.msg
 	versioned/FixedWingLongitudinalSetpoint.msg
 	versioned/GotoSetpoint.msg

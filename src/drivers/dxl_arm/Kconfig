@@ -1,0 +1,12 @@
+menuconfig DRIVERS_DXL_ARM
+	bool "dxl_arm"
+	default n
+	---help---
+		Dynamixel Protocol 2.0 driver and joint-space Delta arm motion controller.
+
+menuconfig USER_DXL_ARM
+	bool "dxl_arm running as userspace module"
+	default n
+	depends on BOARD_PROTECTED && DRIVERS_DXL_ARM
+	---help---
+		Put dxl_arm in userspace memory
