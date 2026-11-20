@@ -20,25 +20,26 @@ RcMode rcModeFromChannel(uint16_t value)
 	return RcMode::UNKNOWN;
 }
 
-RcMode RcSwitch::update(RcMode raw_mode, bool signal_valid, uint64_t timestamp_us, uint32_t debounce_us)
+bool angleForMode(RcMode mode, float minimum, float maximum, float &angle)
 {
-	if (!signal_valid) {
-		_candidate = RcMode::UNKNOWN;
-		_position = RcMode::UNKNOWN;
-		_candidate_since = 0;
-		return _position;
+	switch (mode) {
+	case RcMode::UP:
+		angle = minimum;
+		return true;
+
+	case RcMode::CENTER:
+		angle = 0.0f;
+		return true;
+
+	case RcMode::DOWN:
+		angle = maximum;
+		return true;
+
+	case RcMode::UNKNOWN:
+		return false;
 	}
 
-	if (raw_mode != _candidate || timestamp_us < _candidate_since) {
-		_candidate = raw_mode;
-		_candidate_since = timestamp_us;
-	}
-
-	if (_position != _candidate && timestamp_us - _candidate_since >= debounce_us) {
-		_position = _candidate;
-	}
-
-	return _position;
+	return false;
 }
 
 } // namespace dxl

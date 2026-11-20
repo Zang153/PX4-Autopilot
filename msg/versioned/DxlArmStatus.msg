@@ -5,15 +5,12 @@ uint32 MESSAGE_VERSION = 0
 uint64 timestamp
 uint8 state
 uint8 STATE_HOLD = 0
-uint8 STATE_CENTERING = 1
-uint8 STATE_CENTER_HOLD = 2
-uint8 STATE_RANDOM = 3
-uint8 STATE_FAULT = 4
-uint8 STATE_RAISE = 5
+uint8 STATE_RAISE = 1
+uint8 STATE_CENTER = 2
+uint8 STATE_DOWN = 3
 
-bool torque_initialized # Goal seeding and torque-enable writes completed; not a torque register readback
+bool torque_initialized # Torque-enable write completed; not a torque register readback
 bool feedback_valid
-bool armed
 uint8 rc_mode
 uint8 RC_MODE_UNKNOWN = 0
 uint8 RC_MODE_UP = 1

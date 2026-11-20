@@ -65,8 +65,8 @@ int DxlArm::custom_command(int argc, char *argv[])
 		return PX4_OK;
 	}
 
-	if (strcmp(argv[0], "random") == 0) {
-		instance->_requested_command.store(Command::RANDOM);
+	if (strcmp(argv[0], "down") == 0) {
+		instance->_requested_command.store(Command::DOWN);
 		return PX4_OK;
 	}
 
@@ -93,10 +93,10 @@ Feedback is published as delta_arm_state in the training joint convention. Start
 
 	PRINT_MODULE_USAGE_NAME("dxl_arm", "driver");
 	PRINT_MODULE_USAGE_COMMAND("start");
-	PRINT_MODULE_USAGE_COMMAND_DESCR("center", "Smoothly move to the configured zero angles");
-	PRINT_MODULE_USAGE_COMMAND_DESCR("raise", "Smoothly move to the configured upward angle after centering");
-	PRINT_MODULE_USAGE_COMMAND_DESCR("random", "Start bounded smooth random motion after centering");
-	PRINT_MODULE_USAGE_COMMAND_DESCR("hold", "Hold the latest measured angles");
+	PRINT_MODULE_USAGE_COMMAND_DESCR("center", "Write zero angle directly");
+	PRINT_MODULE_USAGE_COMMAND_DESCR("raise", "Write the configured upward angle directly");
+	PRINT_MODULE_USAGE_COMMAND_DESCR("down", "Write the configured downward angle directly");
+	PRINT_MODULE_USAGE_COMMAND_DESCR("hold", "Keep the current target");
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 	return PX4_OK;
 }
@@ -134,23 +134,6 @@ int DxlArm::zeroCount(uint8_t index) const
 int DxlArm::direction(uint8_t index) const
 {
 	return index == 0 ? _param_sign1.get() : index == 1 ? _param_sign2.get() : _param_sign3.get();
-}
-
-void DxlArm::configureMotion()
-{
-	dxl::MotionConfig config{};
-
-	for (uint8_t i = 0; i < 3; ++i) {
-		config.minimum[i] = _param_q_min.get();
-		config.maximum[i] = _param_q_max.get();
-	}
-
-	config.maximum_velocity = _param_max_velocity.get();
-	config.maximum_acceleration = _param_max_acceleration.get();
-	config.random_amplitude = _param_random_amplitude.get();
-	config.center_tolerance = _param_center_tolerance.get();
-	config.random_seed = _param_random_seed.get();
-	_motion.configure(config);
 }
 
 bool DxlArm::openPort()
@@ -381,7 +364,6 @@ bool DxlArm::readFeedback()
 	}
 
 	_feedback_valid = true;
-	_feedback_seen = true;
 	_last_valid_feedback = now;
 	return true;
 }
@@ -429,7 +411,7 @@ bool DxlArm::ensureTorque()
 		return true;
 	}
 
-	if (!writeGoals(_q_actual) || !setTorque(true)) {
+	if (!setTorque(true)) {
 		++_write_errors;
 		_torque_ready = false;
 		return false;
@@ -460,10 +442,9 @@ void DxlArm::publishStatus(hrt_abstime timestamp)
 {
 	dxl_arm_status_s status{};
 	status.timestamp = timestamp;
-	status.state = static_cast<uint8_t>(_motion.state());
+	status.state = static_cast<uint8_t>(_command_mode);
 	status.torque_initialized = _torque_ready;
 	status.feedback_valid = _feedback_valid;
-	status.armed = _armed;
 	status.rc_mode = static_cast<uint8_t>(_rc_mode);
 	status.feedback_sequence = _feedback_sequence;
 	status.feedback_period_us = _feedback_period_us;
@@ -474,178 +455,117 @@ void DxlArm::publishStatus(hrt_abstime timestamp)
 	for (uint8_t i = 0; i < 3; ++i) {
 		status.raw_position[i] = _raw_positions[i];
 		status.q_actual[i] = _q_actual[i];
-		status.q_target[i] = _motion.target()[i];
+		status.q_target[i] = _q_target[i];
 		status.dxl_error[i] = _dxl_errors[i];
 	}
 
 	_dxl_arm_status_pub.publish(status);
 }
 
-void DxlArm::updateVehicleStatus()
-{
-	vehicle_status_s vehicle_status;
-
-	if (_vehicle_status_sub.update(&vehicle_status)) {
-		_vehicle_status_seen = true;
-		_armed = vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_ARMED;
-	}
-
-	if (_armed && !_param_allow_armed.get()
-	    && (_motion.isMoving() || _motion.centerQualified())) {
-		_motion.hold(_q_actual);
-		PX4_WARN("Arm motion held because armed operation is disabled");
-	}
-}
-
 void DxlArm::updateRc(hrt_abstime timestamp)
 {
-	const bool was_fresh = _rc_fresh;
-	dxl::RcMode raw_mode = dxl::RcMode::UNKNOWN;
+	if (_param_rc_channel.get() <= 0) {
+		_rc_mode = dxl::RcMode::UNKNOWN;
+		return;
+	}
 
 	if (_input_rc_sub.update(&_input_rc)) {
 		_input_rc_seen = true;
 	}
 
-	if (_param_rc_channel.get() <= 0) {
-		_rc_fresh = false;
-		_rc_mode = _rc_switch.update(dxl::RcMode::UNKNOWN, false, timestamp, 0);
-		_pending_rc_command = Command::NONE;
-
-		if (was_fresh) {
-			_motion.hold(_q_actual);
-			PX4_WARN("RC input disabled; arm motion held");
-		}
-
+	if (!_input_rc_seen || timestamp - _input_rc.timestamp_last_signal >= 250000
+	    || _input_rc.rc_lost || _input_rc.rc_failsafe) {
+		_rc_mode = dxl::RcMode::UNKNOWN;
 		return;
 	}
 
-	_rc_fresh = _input_rc_seen && timestamp - _input_rc.timestamp_last_signal < 250000
-		    && !_input_rc.rc_lost && !_input_rc.rc_failsafe;
+	const int channel = _param_rc_channel.get();
 
-	if (_rc_fresh) {
-		const int channel = _param_rc_channel.get();
-
-		if (channel > 0 && channel <= _input_rc.channel_count
-		    && channel <= input_rc_s::RC_INPUT_MAX_CHANNELS) {
-			raw_mode = dxl::rcModeFromChannel(_input_rc.values[channel - 1]);
-		}
-	}
-
-	const dxl::RcMode previous_mode = _rc_mode;
-	const hrt_abstime debounce = static_cast<hrt_abstime>(_param_rc_debounce.get()) * 1000;
-	_rc_mode = _rc_switch.update(raw_mode, _rc_fresh, timestamp, debounce);
-
-	if (!_rc_fresh) {
-		_pending_rc_command = Command::NONE;
-
-		if (was_fresh) {
-			_motion.hold(_q_actual);
-			PX4_WARN("RC lost; arm motion held");
-		}
-
+	if (channel <= 0 || channel > _input_rc.channel_count || channel > input_rc_s::RC_INPUT_MAX_CHANNELS) {
+		_rc_mode = dxl::RcMode::UNKNOWN;
 		return;
 	}
 
-	if (_rc_mode != previous_mode) {
-		_pending_rc_command = Command::NONE;
+	const dxl::RcMode mode = dxl::rcModeFromChannel(_input_rc.values[channel - 1]);
 
-		switch (_rc_mode) {
-		case dxl::RcMode::CENTER:
-			requestCommand(Command::CENTER, timestamp);
-			break;
-
-		case dxl::RcMode::UP:
-			_pending_rc_command = Command::RAISE;
-			break;
-
-		case dxl::RcMode::DOWN:
-			_pending_rc_command = Command::RANDOM;
-			break;
-
-		case dxl::RcMode::UNKNOWN:
-			_motion.hold(_q_actual);
-			PX4_WARN("RC switch position invalid; arm motion held");
-			break;
-		}
+	if (mode == dxl::RcMode::UNKNOWN) {
+		_rc_mode = mode;
+		return;
 	}
 
-	if (_pending_rc_command != Command::NONE && _motion.centerQualified()
-	    && _feedback_valid && _vehicle_status_seen && (!_armed || _param_allow_armed.get())) {
-		if (requestCommand(_pending_rc_command, timestamp)) {
-			_pending_rc_command = Command::NONE;
-		}
+	if (mode == _rc_mode) {
+		return;
+	}
+
+	_rc_mode = mode;
+
+	switch (mode) {
+	case dxl::RcMode::CENTER:
+		requestCommand(Command::CENTER);
+		break;
+
+	case dxl::RcMode::UP:
+		requestCommand(Command::RAISE);
+		break;
+
+	case dxl::RcMode::DOWN:
+		requestCommand(Command::DOWN);
+		break;
+
+	case dxl::RcMode::UNKNOWN:
+		break;
 	}
 }
 
-bool DxlArm::requestCommand(Command command, hrt_abstime timestamp)
+bool DxlArm::requestCommand(Command command)
 {
-	(void)timestamp;
-
-	if (!_feedback_valid) {
-		PX4_WARN("Arm command rejected: no valid feedback");
-		return false;
+	if (command == Command::HOLD) {
+		_command_mode = dxl::RcMode::UNKNOWN;
+		_torque_requested = true;
+		return true;
 	}
 
-	if (!_vehicle_status_seen) {
-		PX4_WARN("Arm command rejected: vehicle arm state is not available");
-		return false;
-	}
-
-	if (_armed && !_param_allow_armed.get()) {
-		PX4_WARN("Arm command rejected while armed");
-		return false;
-	}
+	dxl::RcMode mode = dxl::RcMode::UNKNOWN;
 
 	switch (command) {
 	case Command::CENTER:
-		if (_motion.requestCenter(_q_actual)) {
-			_torque_requested = true;
-			PX4_INFO("Arm centering requested");
-			return true;
-		}
-
+		mode = dxl::RcMode::CENTER;
 		break;
 
 	case Command::RAISE:
-		if (_motion.requestRaise(_q_actual)) {
-			_torque_requested = true;
-			PX4_INFO("Arm upward position requested");
-			return true;
-		}
-
-		PX4_WARN("Upward position requires completed actual centering");
+		mode = dxl::RcMode::UP;
 		break;
 
-	case Command::RANDOM:
-		if (_motion.requestRandom(_q_actual)) {
-			_torque_requested = true;
-			PX4_INFO("Arm random motion requested");
-			return true;
-		}
-
-		PX4_WARN("Random motion requires completed actual centering");
+	case Command::DOWN:
+		mode = dxl::RcMode::DOWN;
 		break;
-
-	case Command::HOLD:
-		_motion.hold(_q_actual);
-		_torque_requested = true;
-		PX4_INFO("Arm hold requested");
-		return true;
 
 	default:
-		break;
+		return false;
 	}
 
-	return false;
+	float angle = 0.0f;
+
+	if (!dxl::angleForMode(mode, _param_q_min.get(), _param_q_max.get(), angle)) {
+		return false;
+	}
+
+	for (uint8_t i = 0; i < 3; ++i) {
+		_q_target[i] = angle;
+	}
+
+	_command_mode = mode;
+	_torque_requested = true;
+	return true;
 }
 
-void DxlArm::processRequests(hrt_abstime timestamp)
+void DxlArm::processRequests()
 {
 	const int command = _requested_command.load();
 
 	if (command != Command::NONE) {
 		_requested_command.store(Command::NONE);
-		requestCommand(static_cast<Command>(command), timestamp);
+		requestCommand(static_cast<Command>(command));
 	}
 }
 
@@ -655,58 +575,34 @@ void DxlArm::run()
 		return;
 	}
 
-	configureMotion();
-	_motion.reset(_q_actual);
-	PX4_INFO("Dynamixel driver running on TELEM1; torque and motion remain command gated");
+	requestCommand(Command::CENTER);
+	PX4_INFO("Dynamixel driver running on TELEM1");
 
 	hrt_abstime now = hrt_absolute_time();
 	hrt_abstime next_feedback = now;
 	hrt_abstime next_command = now;
 	hrt_abstime next_status = now;
-	hrt_abstime last_motion = now;
 
 	while (!should_exit()) {
 		now = hrt_absolute_time();
 
 		if (_parameter_update_sub.updated()) {
 			updateParams();
-			configureMotion();
 		}
 
-		updateVehicleStatus();
 		updateRc(now);
 
 		if (now >= next_feedback) {
 			const bool valid = readFeedback();
 			publishFeedback(valid, hrt_absolute_time());
 			next_feedback = hrt_absolute_time() + 1000000 / _param_feedback_rate.get();
-
-			if (!valid && (_motion.isMoving())) {
-				_motion.fault(_q_actual);
-				_torque_requested = false;
-			}
 		}
 
-		if (_auto_center_pending && _feedback_valid && _vehicle_status_seen) {
-			requestCommand(Command::CENTER, now);
-			_auto_center_pending = false;
-		}
+		processRequests();
 
-		processRequests(now);
-		const float dt = hrt_elapsed_time(&last_motion) * 1.0e-6f;
-		last_motion = now;
-
-		if (_feedback_valid && _torque_requested && ensureTorque()) {
-			_motion.update(_q_actual, dt);
-
-			if (now >= next_command) {
-				if (!writeGoals(_motion.target())) {
-					_motion.fault(_q_actual);
-					_torque_requested = false;
-				}
-
-				next_command = hrt_absolute_time() + 1000000 / _param_command_rate.get();
-			}
+		if (_torque_requested && ensureTorque() && now >= next_command) {
+			writeGoals(_q_target);
+			next_command = hrt_absolute_time() + 1000000 / _param_command_rate.get();
 		}
 
 		if (now >= next_status) {
@@ -722,13 +618,11 @@ void DxlArm::run()
 
 const char *DxlArm::stateName() const
 {
-	switch (_motion.state()) {
-	case dxl::ArmState::HOLD: return "hold";
-	case dxl::ArmState::CENTERING: return "centering";
-	case dxl::ArmState::CENTER_HOLD: return "center_hold";
-	case dxl::ArmState::RANDOM: return "random";
-	case dxl::ArmState::FAULT: return "fault";
-	case dxl::ArmState::RAISE: return "raise";
+	switch (_command_mode) {
+	case dxl::RcMode::UNKNOWN: return "hold";
+	case dxl::RcMode::UP: return "raise";
+	case dxl::RcMode::CENTER: return "center";
+	case dxl::RcMode::DOWN: return "down";
 	}
 
 	return "unknown";

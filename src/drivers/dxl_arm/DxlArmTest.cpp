@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include "dxl_motion.hpp"
 #include "dxl_protocol.hpp"
 #include "dxl_rc.hpp"
 
@@ -103,139 +102,6 @@ TEST(DxlProtocolTest, PartialAndCorruptFramesAreNotAccepted)
 	EXPECT_EQ(dxl::parseStatusPackets(frame, length, packets, 1, offset), 0u);
 }
 
-static dxl::MotionConfig testConfig()
-{
-	dxl::MotionConfig config{};
-
-	for (uint8_t i = 0; i < 3; ++i) {
-		config.minimum[i] = -0.5f;
-		config.maximum[i] = 1.5f;
-	}
-
-	config.maximum_velocity = 0.5f;
-	config.maximum_acceleration = 2.0f;
-	config.random_amplitude = 0.1f;
-	config.center_tolerance = 0.02f;
-	config.random_seed = 7;
-	return config;
-}
-
-TEST(DxlMotionTest, CenteringIsBoundedAndRequiresActualCenter)
-{
-	dxl::MotionController motion;
-	motion.configure(testConfig());
-	const float initial[3] = {0.4f, -0.3f, 0.2f};
-	motion.reset(initial);
-	ASSERT_TRUE(motion.requestCenter(initial));
-	float previous[3] = {initial[0], initial[1], initial[2]};
-	float actual[3] = {initial[0], initial[1], initial[2]};
-
-	for (int step = 0; step < 2000; ++step) {
-		motion.update(actual, 0.01f);
-
-		for (uint8_t i = 0; i < 3; ++i) {
-			EXPECT_LE(fabsf(motion.target()[i] - previous[i]), 0.0051f);
-			previous[i] = motion.target()[i];
-		}
-	}
-
-	for (uint8_t i = 0; i < 3; ++i) {
-		EXPECT_NEAR(motion.target()[i], 0.0f, 1.0e-4f);
-	}
-
-	EXPECT_EQ(motion.state(), dxl::ArmState::CENTERING);
-	const float center[3] = {};
-	motion.update(center, 0.01f);
-	EXPECT_EQ(motion.state(), dxl::ArmState::CENTER_HOLD);
-}
-
-TEST(DxlMotionTest, RandomRequiresCenterAndStaysBounded)
-{
-	dxl::MotionController motion;
-	motion.configure(testConfig());
-	const float center[3] = {};
-	motion.reset(center);
-	EXPECT_FALSE(motion.requestRandom(center));
-	ASSERT_TRUE(motion.requestCenter(center));
-	motion.update(center, 0.01f);
-	ASSERT_EQ(motion.state(), dxl::ArmState::CENTER_HOLD);
-	ASSERT_TRUE(motion.requestRandom(center));
-
-	for (int step = 0; step < 2000; ++step) {
-		motion.update(center, 0.01f);
-
-		for (uint8_t i = 0; i < 3; ++i) {
-			EXPECT_LE(fabsf(motion.target()[i]), 0.1001f);
-			EXPECT_GE(motion.target()[i], -0.5f);
-			EXPECT_LE(motion.target()[i], 1.5f);
-		}
-	}
-}
-
-TEST(DxlMotionTest, FaultOnlyRecoversThroughCentering)
-{
-	dxl::MotionController motion;
-	motion.configure(testConfig());
-	const float center[3] = {};
-	motion.reset(center);
-	ASSERT_TRUE(motion.requestCenter(center));
-	motion.update(center, 0.01f);
-	ASSERT_TRUE(motion.requestRandom(center));
-	motion.fault(center);
-	EXPECT_EQ(motion.state(), dxl::ArmState::FAULT);
-	EXPECT_FALSE(motion.requestRandom(center));
-	EXPECT_TRUE(motion.requestCenter(center));
-	EXPECT_EQ(motion.state(), dxl::ArmState::CENTERING);
-	motion.hold(center);
-	EXPECT_EQ(motion.state(), dxl::ArmState::HOLD);
-}
-
-TEST(DxlMotionTest, RaiseRequiresCenterAndUsesUpwardLimit)
-{
-	dxl::MotionController motion;
-	motion.configure(testConfig());
-	const float center[3] = {};
-	motion.reset(center);
-	EXPECT_FALSE(motion.requestRaise(center));
-	ASSERT_TRUE(motion.requestCenter(center));
-	motion.update(center, 0.01f);
-	ASSERT_TRUE(motion.requestRaise(center));
-
-	for (int step = 0; step < 2000; ++step) {
-		motion.update(center, 0.01f);
-	}
-
-	for (uint8_t i = 0; i < 3; ++i) {
-		EXPECT_NEAR(motion.target()[i], -0.5f, 1.0e-4f);
-	}
-
-	EXPECT_EQ(motion.state(), dxl::ArmState::RAISE);
-	EXPECT_TRUE(motion.centerQualified());
-}
-
-TEST(DxlMotionTest, OuterModesCanChangeAfterInitialCenter)
-{
-	dxl::MotionController motion;
-	motion.configure(testConfig());
-	const float center[3] = {};
-	motion.reset(center);
-	ASSERT_TRUE(motion.requestCenter(center));
-	motion.update(center, 0.01f);
-	ASSERT_TRUE(motion.requestRaise(center));
-	const float raised[3] = {-0.5f, -0.5f, -0.5f};
-
-	for (int step = 0; step < 2000; ++step) {
-		motion.update(raised, 0.01f);
-	}
-
-	ASSERT_TRUE(motion.requestRandom(raised));
-	EXPECT_EQ(motion.state(), dxl::ArmState::RANDOM);
-	motion.hold(raised);
-	EXPECT_FALSE(motion.centerQualified());
-	EXPECT_FALSE(motion.requestRaise(raised));
-	EXPECT_FALSE(motion.requestRandom(raised));
-}
-
 TEST(DxlRcTest, ChannelMatchesMeasuredThreePositionDetents)
 {
 	EXPECT_EQ(dxl::rcModeFromChannel(2000), dxl::RcMode::UP);
@@ -252,28 +118,20 @@ TEST(DxlRcTest, ChannelMatchesMeasuredThreePositionDetents)
 	EXPECT_EQ(dxl::rcModeFromChannel(898), dxl::RcMode::UNKNOWN);
 }
 
-TEST(DxlRcTest, SwitchChangesOnlyAfterDebounce)
+TEST(DxlRcTest, ModesMapToDirectPositionCommands)
 {
-	dxl::RcSwitch rc_switch;
-	EXPECT_EQ(rc_switch.update(dxl::RcMode::CENTER, true, 0, 150000), dxl::RcMode::UNKNOWN);
-	EXPECT_EQ(rc_switch.update(dxl::RcMode::CENTER, true, 149999, 150000), dxl::RcMode::UNKNOWN);
-	EXPECT_EQ(rc_switch.update(dxl::RcMode::CENTER, true, 150000, 150000), dxl::RcMode::CENTER);
-	EXPECT_EQ(rc_switch.update(dxl::RcMode::DOWN, true, 150001, 150000), dxl::RcMode::CENTER);
-	EXPECT_EQ(rc_switch.update(dxl::RcMode::DOWN, true, 299999, 150000), dxl::RcMode::CENTER);
-	EXPECT_EQ(rc_switch.update(dxl::RcMode::DOWN, true, 300001, 150000), dxl::RcMode::DOWN);
-	EXPECT_EQ(rc_switch.update(dxl::RcMode::UP, true, 300002, 150000), dxl::RcMode::DOWN);
-	EXPECT_EQ(rc_switch.update(dxl::RcMode::UP, true, 450002, 150000), dxl::RcMode::UP);
-}
-
-TEST(DxlRcTest, InvalidDetentAndSignalLossResetTheSwitch)
-{
-	dxl::RcSwitch rc_switch;
-	EXPECT_EQ(rc_switch.update(dxl::RcMode::DOWN, true, 0, 150000), dxl::RcMode::UNKNOWN);
-	EXPECT_EQ(rc_switch.update(dxl::RcMode::DOWN, true, 150000, 150000), dxl::RcMode::DOWN);
-	EXPECT_EQ(rc_switch.update(dxl::RcMode::UNKNOWN, true, 150001, 150000), dxl::RcMode::DOWN);
-	EXPECT_EQ(rc_switch.update(dxl::RcMode::UNKNOWN, true, 300001, 150000), dxl::RcMode::UNKNOWN);
-	EXPECT_EQ(rc_switch.update(dxl::RcMode::DOWN, true, 300002, 150000), dxl::RcMode::UNKNOWN);
-	EXPECT_EQ(rc_switch.update(dxl::RcMode::DOWN, true, 450002, 150000), dxl::RcMode::DOWN);
-	EXPECT_EQ(rc_switch.update(dxl::RcMode::DOWN, false, 450003, 150000), dxl::RcMode::UNKNOWN);
-	EXPECT_EQ(rc_switch.update(dxl::RcMode::DOWN, true, 450004, 150000), dxl::RcMode::UNKNOWN);
+	constexpr float pi = 3.14159265358979323846f;
+	float angle = 0.25f;
+	ASSERT_TRUE(dxl::angleForMode(dxl::RcMode::UP, -pi / 6.0f, pi / 2.0f, angle));
+	EXPECT_NEAR(angle, -pi / 6.0f, 1.0e-6f);
+	EXPECT_EQ(dxl::radiansToCounts(angle, 2048, 1), 1707);
+	ASSERT_TRUE(dxl::angleForMode(dxl::RcMode::CENTER, -pi / 6.0f, pi / 2.0f, angle));
+	EXPECT_EQ(angle, 0.0f);
+	EXPECT_EQ(dxl::radiansToCounts(angle, 2048, 1), 2048);
+	ASSERT_TRUE(dxl::angleForMode(dxl::RcMode::DOWN, -pi / 6.0f, pi / 2.0f, angle));
+	EXPECT_NEAR(angle, pi / 2.0f, 1.0e-6f);
+	EXPECT_EQ(dxl::radiansToCounts(angle, 2048, 1), 3072);
+	angle = 0.25f;
+	EXPECT_FALSE(dxl::angleForMode(dxl::RcMode::UNKNOWN, -pi / 6.0f, pi / 2.0f, angle));
+	EXPECT_EQ(angle, 0.25f);
 }

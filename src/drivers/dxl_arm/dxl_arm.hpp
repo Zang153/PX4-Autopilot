@@ -1,6 +1,5 @@
 #pragma once
 
-#include "dxl_motion.hpp"
 #include "dxl_protocol.hpp"
 #include "dxl_rc.hpp"
 
@@ -18,7 +17,6 @@
 #include <uORB/topics/dxl_arm_status.h>
 #include <uORB/topics/input_rc.h>
 #include <uORB/topics/parameter_update.h>
-#include <uORB/topics/vehicle_status.h>
 
 class DxlArm : public ModuleBase, public ModuleParams
 {
@@ -39,9 +37,9 @@ private:
 	enum Command : int {
 		NONE = 0,
 		CENTER = 1,
-		RANDOM = 2,
-		HOLD = 3,
-		RAISE = 4,
+		RAISE = 2,
+		DOWN = 3,
+		HOLD = 4,
 	};
 
 	bool openPort();
@@ -50,7 +48,6 @@ private:
 	int servoId(uint8_t index) const;
 	int zeroCount(uint8_t index) const;
 	int direction(uint8_t index) const;
-	void configureMotion();
 
 	bool writeAll(const uint8_t *data, size_t length, uint32_t timeout_us);
 	int exchange(const uint8_t *request, size_t request_length, dxl::StatusPacket replies[3],
@@ -62,20 +59,18 @@ private:
 
 	void publishFeedback(bool valid, hrt_abstime timestamp);
 	void publishStatus(hrt_abstime timestamp);
-	void updateVehicleStatus();
 	void updateRc(hrt_abstime timestamp);
-	void processRequests(hrt_abstime timestamp);
-	bool requestCommand(Command command, hrt_abstime timestamp);
+	void processRequests();
+	bool requestCommand(Command command);
 	const char *stateName() const;
 
 	int _fd{-1};
 	px4::atomic<int> _requested_command{Command::NONE};
-	dxl::MotionController _motion;
 
 	float _q_actual[3] {};
+	float _q_target[3] {};
 	int32_t _raw_positions[3] {};
 	bool _feedback_valid{false};
-	bool _feedback_seen{false};
 	bool _torque_ready{false};
 	bool _torque_requested{false};
 	uint32_t _feedback_sequence{0};
@@ -86,19 +81,13 @@ private:
 	uint8_t _dxl_errors[3] {};
 	hrt_abstime _last_valid_feedback{0};
 
-	bool _armed{false};
-	bool _vehicle_status_seen{false};
-	bool _auto_center_pending{true};
 	input_rc_s _input_rc{};
 	bool _input_rc_seen{false};
-	bool _rc_fresh{false};
-	dxl::RcSwitch _rc_switch;
 	dxl::RcMode _rc_mode{dxl::RcMode::UNKNOWN};
-	Command _pending_rc_command{Command::NONE};
+	dxl::RcMode _command_mode{dxl::RcMode::UNKNOWN};
 
 	uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};
 	uORB::Subscription _input_rc_sub{ORB_ID(input_rc)};
-	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
 	uORB::Publication<delta_arm_state_s> _delta_arm_state_pub{ORB_ID(delta_arm_state)};
 	uORB::Publication<dxl_arm_status_s> _dxl_arm_status_pub{ORB_ID(dxl_arm_status)};
 
@@ -115,15 +104,8 @@ private:
 		(ParamInt<px4::params::DXL_SIGN3>) _param_sign3,
 		(ParamFloat<px4::params::DXL_Q_MIN>) _param_q_min,
 		(ParamFloat<px4::params::DXL_Q_MAX>) _param_q_max,
-		(ParamFloat<px4::params::DXL_MAX_VEL>) _param_max_velocity,
-		(ParamFloat<px4::params::DXL_MAX_ACC>) _param_max_acceleration,
-		(ParamFloat<px4::params::DXL_RAND_AMP>) _param_random_amplitude,
-		(ParamFloat<px4::params::DXL_CENTER_TOL>) _param_center_tolerance,
-		(ParamInt<px4::params::DXL_RAND_SEED>) _param_random_seed,
 		(ParamInt<px4::params::DXL_FB_HZ>) _param_feedback_rate,
 		(ParamInt<px4::params::DXL_CMD_HZ>) _param_command_rate,
-		(ParamInt<px4::params::DXL_RC_CHANNEL>) _param_rc_channel,
-		(ParamInt<px4::params::DXL_RC_DB_MS>) _param_rc_debounce,
-		(ParamBool<px4::params::DXL_ALLOW_ARMED>) _param_allow_armed
+		(ParamInt<px4::params::DXL_RC_CHANNEL>) _param_rc_channel
 	)
 };

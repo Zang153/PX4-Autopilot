@@ -13,16 +13,6 @@ enum class RcMode : uint8_t {
 };
 
 RcMode rcModeFromChannel(uint16_t value);
-
-class RcSwitch
-{
-public:
-	RcMode update(RcMode raw_mode, bool signal_valid, uint64_t timestamp_us, uint32_t debounce_us);
-
-private:
-	RcMode _candidate{RcMode::UNKNOWN};
-	RcMode _position{RcMode::UNKNOWN};
-	uint64_t _candidate_since{0};
-};
+bool angleForMode(RcMode mode, float minimum, float maximum, float &angle);
 
 } // namespace dxl
