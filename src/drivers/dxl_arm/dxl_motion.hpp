@@ -11,6 +11,7 @@ enum class ArmState : uint8_t {
 	CENTER_HOLD = 2,
 	RANDOM = 3,
 	FAULT = 4,
+	RAISE = 5,
 };
 
 struct MotionConfig {
@@ -30,6 +31,7 @@ public:
 	void reset(const float actual[3]);
 
 	bool requestCenter(const float actual[3]);
+	bool requestRaise(const float actual[3]);
 	bool requestRandom(const float actual[3]);
 	void hold(const float actual[3]);
 	void fault(const float actual[3]);
@@ -39,9 +41,15 @@ public:
 	ArmState state() const { return _state; }
 	const float *target() const { return _position; }
 	bool centered(const float actual[3]) const;
+	bool centerQualified() const { return _center_qualified; }
+	bool isMoving() const
+	{
+		return _state == ArmState::CENTERING || _state == ArmState::RAISE || _state == ArmState::RANDOM;
+	}
 
 private:
 	void resetPlanner(const float actual[3], ArmState state);
+	bool actualIsFinite(const float actual[3]) const;
 	bool plannerSettled() const;
 	void chooseRandomGoal();
 	uint32_t nextRandom();
@@ -49,6 +57,7 @@ private:
 
 	MotionConfig _config{};
 	ArmState _state{ArmState::HOLD};
+	bool _center_qualified{false};
 	float _position[3] {};
 	float _velocity[3] {};
 	float _goal[3] {};

@@ -2,6 +2,7 @@
 
 #include "dxl_motion.hpp"
 #include "dxl_protocol.hpp"
+#include "dxl_rc.hpp"
 
 #include <math.h>
 #include <string.h>
@@ -187,4 +188,92 @@ TEST(DxlMotionTest, FaultOnlyRecoversThroughCentering)
 	EXPECT_EQ(motion.state(), dxl::ArmState::CENTERING);
 	motion.hold(center);
 	EXPECT_EQ(motion.state(), dxl::ArmState::HOLD);
+}
+
+TEST(DxlMotionTest, RaiseRequiresCenterAndUsesUpwardLimit)
+{
+	dxl::MotionController motion;
+	motion.configure(testConfig());
+	const float center[3] = {};
+	motion.reset(center);
+	EXPECT_FALSE(motion.requestRaise(center));
+	ASSERT_TRUE(motion.requestCenter(center));
+	motion.update(center, 0.01f);
+	ASSERT_TRUE(motion.requestRaise(center));
+
+	for (int step = 0; step < 2000; ++step) {
+		motion.update(center, 0.01f);
+	}
+
+	for (uint8_t i = 0; i < 3; ++i) {
+		EXPECT_NEAR(motion.target()[i], -0.5f, 1.0e-4f);
+	}
+
+	EXPECT_EQ(motion.state(), dxl::ArmState::RAISE);
+	EXPECT_TRUE(motion.centerQualified());
+}
+
+TEST(DxlMotionTest, OuterModesCanChangeAfterInitialCenter)
+{
+	dxl::MotionController motion;
+	motion.configure(testConfig());
+	const float center[3] = {};
+	motion.reset(center);
+	ASSERT_TRUE(motion.requestCenter(center));
+	motion.update(center, 0.01f);
+	ASSERT_TRUE(motion.requestRaise(center));
+	const float raised[3] = {-0.5f, -0.5f, -0.5f};
+
+	for (int step = 0; step < 2000; ++step) {
+		motion.update(raised, 0.01f);
+	}
+
+	ASSERT_TRUE(motion.requestRandom(raised));
+	EXPECT_EQ(motion.state(), dxl::ArmState::RANDOM);
+	motion.hold(raised);
+	EXPECT_FALSE(motion.centerQualified());
+	EXPECT_FALSE(motion.requestRaise(raised));
+	EXPECT_FALSE(motion.requestRandom(raised));
+}
+
+TEST(DxlRcTest, ChannelMatchesMeasuredThreePositionDetents)
+{
+	EXPECT_EQ(dxl::rcModeFromChannel(2000), dxl::RcMode::UP);
+	EXPECT_EQ(dxl::rcModeFromChannel(1900), dxl::RcMode::UP);
+	EXPECT_EQ(dxl::rcModeFromChannel(2100), dxl::RcMode::UP);
+	EXPECT_EQ(dxl::rcModeFromChannel(1503), dxl::RcMode::CENTER);
+	EXPECT_EQ(dxl::rcModeFromChannel(1403), dxl::RcMode::CENTER);
+	EXPECT_EQ(dxl::rcModeFromChannel(1603), dxl::RcMode::CENTER);
+	EXPECT_EQ(dxl::rcModeFromChannel(999), dxl::RcMode::DOWN);
+	EXPECT_EQ(dxl::rcModeFromChannel(899), dxl::RcMode::DOWN);
+	EXPECT_EQ(dxl::rcModeFromChannel(1099), dxl::RcMode::DOWN);
+	EXPECT_EQ(dxl::rcModeFromChannel(1700), dxl::RcMode::UNKNOWN);
+	EXPECT_EQ(dxl::rcModeFromChannel(2101), dxl::RcMode::UNKNOWN);
+	EXPECT_EQ(dxl::rcModeFromChannel(898), dxl::RcMode::UNKNOWN);
+}
+
+TEST(DxlRcTest, SwitchChangesOnlyAfterDebounce)
+{
+	dxl::RcSwitch rc_switch;
+	EXPECT_EQ(rc_switch.update(dxl::RcMode::CENTER, true, 0, 150000), dxl::RcMode::UNKNOWN);
+	EXPECT_EQ(rc_switch.update(dxl::RcMode::CENTER, true, 149999, 150000), dxl::RcMode::UNKNOWN);
+	EXPECT_EQ(rc_switch.update(dxl::RcMode::CENTER, true, 150000, 150000), dxl::RcMode::CENTER);
+	EXPECT_EQ(rc_switch.update(dxl::RcMode::DOWN, true, 150001, 150000), dxl::RcMode::CENTER);
+	EXPECT_EQ(rc_switch.update(dxl::RcMode::DOWN, true, 299999, 150000), dxl::RcMode::CENTER);
+	EXPECT_EQ(rc_switch.update(dxl::RcMode::DOWN, true, 300001, 150000), dxl::RcMode::DOWN);
+	EXPECT_EQ(rc_switch.update(dxl::RcMode::UP, true, 300002, 150000), dxl::RcMode::DOWN);
+	EXPECT_EQ(rc_switch.update(dxl::RcMode::UP, true, 450002, 150000), dxl::RcMode::UP);
+}
+
+TEST(DxlRcTest, InvalidDetentAndSignalLossResetTheSwitch)
+{
+	dxl::RcSwitch rc_switch;
+	EXPECT_EQ(rc_switch.update(dxl::RcMode::DOWN, true, 0, 150000), dxl::RcMode::UNKNOWN);
+	EXPECT_EQ(rc_switch.update(dxl::RcMode::DOWN, true, 150000, 150000), dxl::RcMode::DOWN);
+	EXPECT_EQ(rc_switch.update(dxl::RcMode::UNKNOWN, true, 150001, 150000), dxl::RcMode::DOWN);
+	EXPECT_EQ(rc_switch.update(dxl::RcMode::UNKNOWN, true, 300001, 150000), dxl::RcMode::UNKNOWN);
+	EXPECT_EQ(rc_switch.update(dxl::RcMode::DOWN, true, 300002, 150000), dxl::RcMode::UNKNOWN);
+	EXPECT_EQ(rc_switch.update(dxl::RcMode::DOWN, true, 450002, 150000), dxl::RcMode::DOWN);
+	EXPECT_EQ(rc_switch.update(dxl::RcMode::DOWN, false, 450003, 150000), dxl::RcMode::UNKNOWN);
+	EXPECT_EQ(rc_switch.update(dxl::RcMode::DOWN, true, 450004, 150000), dxl::RcMode::UNKNOWN);
 }

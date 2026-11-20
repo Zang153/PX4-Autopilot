@@ -2,6 +2,7 @@
 
 #include "dxl_motion.hpp"
 #include "dxl_protocol.hpp"
+#include "dxl_rc.hpp"
 
 #include <px4_platform_common/atomic.h>
 #include <px4_platform_common/module.h>
@@ -40,6 +41,7 @@ private:
 		CENTER = 1,
 		RANDOM = 2,
 		HOLD = 3,
+		RAISE = 4,
 	};
 
 	bool openPort();
@@ -63,7 +65,7 @@ private:
 	void updateVehicleStatus();
 	void updateRc(hrt_abstime timestamp);
 	void processRequests(hrt_abstime timestamp);
-	void requestCommand(Command command, hrt_abstime timestamp);
+	bool requestCommand(Command command, hrt_abstime timestamp);
 	const char *stateName() const;
 
 	int _fd{-1};
@@ -90,12 +92,9 @@ private:
 	input_rc_s _input_rc{};
 	bool _input_rc_seen{false};
 	bool _rc_fresh{false};
-	bool _rc_center{false};
-	bool _rc_random{false};
-	bool _rc_center_candidate{false};
-	bool _rc_random_candidate{false};
-	hrt_abstime _rc_center_changed{0};
-	hrt_abstime _rc_random_changed{0};
+	dxl::RcSwitch _rc_switch;
+	dxl::RcMode _rc_mode{dxl::RcMode::UNKNOWN};
+	Command _pending_rc_command{Command::NONE};
 
 	uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};
 	uORB::Subscription _input_rc_sub{ORB_ID(input_rc)};
@@ -123,8 +122,7 @@ private:
 		(ParamInt<px4::params::DXL_RAND_SEED>) _param_random_seed,
 		(ParamInt<px4::params::DXL_FB_HZ>) _param_feedback_rate,
 		(ParamInt<px4::params::DXL_CMD_HZ>) _param_command_rate,
-		(ParamInt<px4::params::DXL_RC_CENTER>) _param_rc_center,
-		(ParamInt<px4::params::DXL_RC_RANDOM>) _param_rc_random,
+		(ParamInt<px4::params::DXL_RC_CHANNEL>) _param_rc_channel,
 		(ParamInt<px4::params::DXL_RC_DB_MS>) _param_rc_debounce,
 		(ParamBool<px4::params::DXL_ALLOW_ARMED>) _param_allow_armed
 	)

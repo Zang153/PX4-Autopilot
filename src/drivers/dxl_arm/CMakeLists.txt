@@ -8,6 +8,7 @@ px4_add_module(
 		dxl_arm.cpp
 		dxl_protocol.cpp
 		dxl_motion.cpp
+		dxl_rc.cpp
 	MODULE_CONFIG
 		module.yaml
 )
@@ -16,5 +17,5 @@ target_compile_features(drivers__dxl_arm PRIVATE cxx_std_17)
 
 px4_add_unit_gtest(
 	SRC DxlArmTest.cpp
-	EXTRA_SRCS dxl_protocol.cpp dxl_motion.cpp
+	EXTRA_SRCS dxl_protocol.cpp dxl_motion.cpp dxl_rc.cpp
 )

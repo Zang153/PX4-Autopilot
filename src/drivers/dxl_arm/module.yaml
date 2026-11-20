@@ -130,20 +130,14 @@ parameters:
             min: 5
             max: 100
             unit: Hz
-        DXL_RC_CENTER:
-            description: {short: RC channel for centering, 0 disables; default CH7}
+        DXL_RC_CHANNEL:
+            description: {short: Three-position SC channel for up/center/random, 0 disables; default CH7}
             type: int32
             default: 7
             min: 0
             max: 18
-        DXL_RC_RANDOM:
-            description: {short: RC channel for random motion, 0 disables; default CH8}
-            type: int32
-            default: 8
-            min: 0
-            max: 18
         DXL_RC_DB_MS:
-            description: {short: RC arm-command debounce time}
+            description: {short: RC three-position switch debounce time}
             type: int32
             default: 150
             min: 0
@@ -153,7 +147,7 @@ parameters:
             description:
                 short: Allow arm motion commands while the vehicle is armed
                 long: |
-                    Automatic centering still requires valid feedback and vehicle status. Random motion requires completed centering and an explicit RC or shell command; arming alone never starts random motion.
+                    Automatic centering still requires valid feedback and vehicle status. The CH7 three-position switch selects fixed-up, center, or random motion. Outer positions require completed centering; arming alone never requests random motion.
             type: boolean
             default: true
             category: System

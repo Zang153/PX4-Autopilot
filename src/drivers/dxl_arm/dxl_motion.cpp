@@ -22,12 +22,7 @@ void MotionController::resetPlanner(const float actual[3], ArmState state)
 	}
 }
 
-void MotionController::reset(const float actual[3])
-{
-	resetPlanner(actual, ArmState::HOLD);
-}
-
-bool MotionController::requestCenter(const float actual[3])
+bool MotionController::actualIsFinite(const float actual[3]) const
 {
 	for (uint8_t i = 0; i < 3; ++i) {
 		if (!isfinite(actual[i])) {
@@ -35,6 +30,22 @@ bool MotionController::requestCenter(const float actual[3])
 		}
 	}
 
+	return true;
+}
+
+void MotionController::reset(const float actual[3])
+{
+	_center_qualified = false;
+	resetPlanner(actual, ArmState::HOLD);
+}
+
+bool MotionController::requestCenter(const float actual[3])
+{
+	if (!actualIsFinite(actual)) {
+		return false;
+	}
+
+	_center_qualified = false;
 	resetPlanner(actual, ArmState::CENTERING);
 
 	for (uint8_t i = 0; i < 3; ++i) {
@@ -44,9 +55,24 @@ bool MotionController::requestCenter(const float actual[3])
 	return true;
 }
 
+bool MotionController::requestRaise(const float actual[3])
+{
+	if (!_center_qualified || !actualIsFinite(actual)) {
+		return false;
+	}
+
+	resetPlanner(actual, ArmState::RAISE);
+
+	for (uint8_t i = 0; i < 3; ++i) {
+		_goal[i] = _config.minimum[i];
+	}
+
+	return true;
+}
+
 bool MotionController::requestRandom(const float actual[3])
 {
-	if (_state != ArmState::CENTER_HOLD || !centered(actual)) {
+	if (!_center_qualified || !actualIsFinite(actual)) {
 		return false;
 	}
 
@@ -56,11 +82,13 @@ bool MotionController::requestRandom(const float actual[3])
 
 void MotionController::hold(const float actual[3])
 {
+	_center_qualified = false;
 	resetPlanner(actual, ArmState::HOLD);
 }
 
 void MotionController::fault(const float actual[3])
 {
+	_center_qualified = false;
 	resetPlanner(actual, ArmState::FAULT);
 }
 
@@ -109,7 +137,7 @@ void MotionController::chooseRandomGoal()
 
 void MotionController::update(const float actual[3], float dt)
 {
-	if (_state != ArmState::CENTERING && _state != ArmState::RANDOM) {
+	if (!isMoving()) {
 		return;
 	}
 
@@ -151,6 +179,7 @@ void MotionController::update(const float actual[3], float dt)
 
 	if (_state == ArmState::CENTERING && plannerSettled() && centered(actual)) {
 		_state = ArmState::CENTER_HOLD;
+		_center_qualified = true;
 	}
 }
 

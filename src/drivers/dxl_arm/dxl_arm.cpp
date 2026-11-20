@@ -60,6 +60,11 @@ int DxlArm::custom_command(int argc, char *argv[])
 		return PX4_OK;
 	}
 
+	if (strcmp(argv[0], "raise") == 0) {
+		instance->_requested_command.store(Command::RAISE);
+		return PX4_OK;
+	}
+
 	if (strcmp(argv[0], "random") == 0) {
 		instance->_requested_command.store(Command::RANDOM);
 		return PX4_OK;
@@ -89,6 +94,7 @@ Feedback is published as delta_arm_state in the training joint convention. Start
 	PRINT_MODULE_USAGE_NAME("dxl_arm", "driver");
 	PRINT_MODULE_USAGE_COMMAND("start");
 	PRINT_MODULE_USAGE_COMMAND_DESCR("center", "Smoothly move to the configured zero angles");
+	PRINT_MODULE_USAGE_COMMAND_DESCR("raise", "Smoothly move to the configured upward angle after centering");
 	PRINT_MODULE_USAGE_COMMAND_DESCR("random", "Start bounded smooth random motion after centering");
 	PRINT_MODULE_USAGE_COMMAND_DESCR("hold", "Hold the latest measured angles");
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
@@ -458,8 +464,7 @@ void DxlArm::publishStatus(hrt_abstime timestamp)
 	status.torque_initialized = _torque_ready;
 	status.feedback_valid = _feedback_valid;
 	status.armed = _armed;
-	status.rc_center_active = _rc_center;
-	status.rc_random_active = _rc_random;
+	status.rc_mode = static_cast<uint8_t>(_rc_mode);
 	status.feedback_sequence = _feedback_sequence;
 	status.feedback_period_us = _feedback_period_us;
 	status.read_latency_us = _read_latency_us;
@@ -486,7 +491,7 @@ void DxlArm::updateVehicleStatus()
 	}
 
 	if (_armed && !_param_allow_armed.get()
-	    && (_motion.state() == dxl::ArmState::CENTERING || _motion.state() == dxl::ArmState::RANDOM)) {
+	    && (_motion.isMoving() || _motion.centerQualified())) {
 		_motion.hold(_q_actual);
 		PX4_WARN("Arm motion held because armed operation is disabled");
 	}
@@ -495,38 +500,45 @@ void DxlArm::updateVehicleStatus()
 void DxlArm::updateRc(hrt_abstime timestamp)
 {
 	const bool was_fresh = _rc_fresh;
-	bool raw_center = false;
-	bool raw_random = false;
+	dxl::RcMode raw_mode = dxl::RcMode::UNKNOWN;
 
 	if (_input_rc_sub.update(&_input_rc)) {
 		_input_rc_seen = true;
+	}
+
+	if (_param_rc_channel.get() <= 0) {
+		_rc_fresh = false;
+		_rc_mode = _rc_switch.update(dxl::RcMode::UNKNOWN, false, timestamp, 0);
+		_pending_rc_command = Command::NONE;
+
+		if (was_fresh) {
+			_motion.hold(_q_actual);
+			PX4_WARN("RC input disabled; arm motion held");
+		}
+
+		return;
 	}
 
 	_rc_fresh = _input_rc_seen && timestamp - _input_rc.timestamp_last_signal < 250000
 		    && !_input_rc.rc_lost && !_input_rc.rc_failsafe;
 
 	if (_rc_fresh) {
-		const int center_channel = _param_rc_center.get();
-		const int random_channel = _param_rc_random.get();
+		const int channel = _param_rc_channel.get();
 
-		if (center_channel > 0 && center_channel <= _input_rc.channel_count
-		    && center_channel <= input_rc_s::RC_INPUT_MAX_CHANNELS) {
-			raw_center = _input_rc.values[center_channel - 1] > 1700;
-		}
-
-		if (random_channel > 0 && random_channel <= _input_rc.channel_count
-		    && random_channel <= input_rc_s::RC_INPUT_MAX_CHANNELS) {
-			raw_random = _input_rc.values[random_channel - 1] > 1700;
+		if (channel > 0 && channel <= _input_rc.channel_count
+		    && channel <= input_rc_s::RC_INPUT_MAX_CHANNELS) {
+			raw_mode = dxl::rcModeFromChannel(_input_rc.values[channel - 1]);
 		}
 	}
 
-	if (!_rc_fresh) {
-		_rc_center = false;
-		_rc_random = false;
-		_rc_center_candidate = false;
-		_rc_random_candidate = false;
+	const dxl::RcMode previous_mode = _rc_mode;
+	const hrt_abstime debounce = static_cast<hrt_abstime>(_param_rc_debounce.get()) * 1000;
+	_rc_mode = _rc_switch.update(raw_mode, _rc_fresh, timestamp, debounce);
 
-		if (was_fresh && (_motion.state() == dxl::ArmState::CENTERING || _motion.state() == dxl::ArmState::RANDOM)) {
+	if (!_rc_fresh) {
+		_pending_rc_command = Command::NONE;
+
+		if (was_fresh) {
 			_motion.hold(_q_actual);
 			PX4_WARN("RC lost; arm motion held");
 		}
@@ -534,53 +546,54 @@ void DxlArm::updateRc(hrt_abstime timestamp)
 		return;
 	}
 
-	if (raw_center != _rc_center_candidate) {
-		_rc_center_candidate = raw_center;
-		_rc_center_changed = timestamp;
+	if (_rc_mode != previous_mode) {
+		_pending_rc_command = Command::NONE;
+
+		switch (_rc_mode) {
+		case dxl::RcMode::CENTER:
+			requestCommand(Command::CENTER, timestamp);
+			break;
+
+		case dxl::RcMode::UP:
+			_pending_rc_command = Command::RAISE;
+			break;
+
+		case dxl::RcMode::DOWN:
+			_pending_rc_command = Command::RANDOM;
+			break;
+
+		case dxl::RcMode::UNKNOWN:
+			_motion.hold(_q_actual);
+			PX4_WARN("RC switch position invalid; arm motion held");
+			break;
+		}
 	}
 
-	if (raw_random != _rc_random_candidate) {
-		_rc_random_candidate = raw_random;
-		_rc_random_changed = timestamp;
-	}
-
-	const hrt_abstime debounce = static_cast<hrt_abstime>(_param_rc_debounce.get()) * 1000;
-	const bool previous_center = _rc_center;
-	const bool previous_random = _rc_random;
-
-	if (_rc_center != _rc_center_candidate && timestamp - _rc_center_changed >= debounce) {
-		_rc_center = _rc_center_candidate;
-	}
-
-	if (_rc_random != _rc_random_candidate && timestamp - _rc_random_changed >= debounce) {
-		_rc_random = _rc_random_candidate;
-	}
-
-	if (_rc_center && !previous_center) {
-		requestCommand(Command::CENTER, timestamp);
-
-	} else if (_rc_random && !previous_random && !_rc_center) {
-		requestCommand(Command::RANDOM, timestamp);
+	if (_pending_rc_command != Command::NONE && _motion.centerQualified()
+	    && _feedback_valid && _vehicle_status_seen && (!_armed || _param_allow_armed.get())) {
+		if (requestCommand(_pending_rc_command, timestamp)) {
+			_pending_rc_command = Command::NONE;
+		}
 	}
 }
 
-void DxlArm::requestCommand(Command command, hrt_abstime timestamp)
+bool DxlArm::requestCommand(Command command, hrt_abstime timestamp)
 {
 	(void)timestamp;
 
 	if (!_feedback_valid) {
 		PX4_WARN("Arm command rejected: no valid feedback");
-		return;
+		return false;
 	}
 
 	if (!_vehicle_status_seen) {
 		PX4_WARN("Arm command rejected: vehicle arm state is not available");
-		return;
+		return false;
 	}
 
 	if (_armed && !_param_allow_armed.get()) {
 		PX4_WARN("Arm command rejected while armed");
-		return;
+		return false;
 	}
 
 	switch (command) {
@@ -588,30 +601,42 @@ void DxlArm::requestCommand(Command command, hrt_abstime timestamp)
 		if (_motion.requestCenter(_q_actual)) {
 			_torque_requested = true;
 			PX4_INFO("Arm centering requested");
+			return true;
 		}
 
+		break;
+
+	case Command::RAISE:
+		if (_motion.requestRaise(_q_actual)) {
+			_torque_requested = true;
+			PX4_INFO("Arm upward position requested");
+			return true;
+		}
+
+		PX4_WARN("Upward position requires completed actual centering");
 		break;
 
 	case Command::RANDOM:
 		if (_motion.requestRandom(_q_actual)) {
 			_torque_requested = true;
 			PX4_INFO("Arm random motion requested");
-
-		} else {
-			PX4_WARN("Random motion requires completed actual centering");
+			return true;
 		}
 
+		PX4_WARN("Random motion requires completed actual centering");
 		break;
 
 	case Command::HOLD:
 		_motion.hold(_q_actual);
 		_torque_requested = true;
 		PX4_INFO("Arm hold requested");
-		break;
+		return true;
 
 	default:
 		break;
 	}
+
+	return false;
 }
 
 void DxlArm::processRequests(hrt_abstime timestamp)
@@ -656,7 +681,7 @@ void DxlArm::run()
 			publishFeedback(valid, hrt_absolute_time());
 			next_feedback = hrt_absolute_time() + 1000000 / _param_feedback_rate.get();
 
-			if (!valid && (_motion.state() == dxl::ArmState::CENTERING || _motion.state() == dxl::ArmState::RANDOM)) {
+			if (!valid && (_motion.isMoving())) {
 				_motion.fault(_q_actual);
 				_torque_requested = false;
 			}
@@ -703,6 +728,7 @@ const char *DxlArm::stateName() const
 	case dxl::ArmState::CENTER_HOLD: return "center_hold";
 	case dxl::ArmState::RANDOM: return "random";
 	case dxl::ArmState::FAULT: return "fault";
+	case dxl::ArmState::RAISE: return "raise";
 	}
 
 	return "unknown";
@@ -714,8 +740,8 @@ int DxlArm::print_status()
 		 _torque_ready ? "enabled" : "not initialized");
 	PX4_INFO("sequence: %lu, period: %lu us, read latency: %lu us", (unsigned long)_feedback_sequence,
 		 (unsigned long)_feedback_period_us, (unsigned long)_read_latency_us);
-	PX4_INFO("read errors: %lu, write errors: %lu, RC center/random: %d/%d", (unsigned long)_read_errors,
-		 (unsigned long)_write_errors, _rc_center, _rc_random);
+	PX4_INFO("read errors: %lu, write errors: %lu, RC mode: %d", (unsigned long)_read_errors,
+		 (unsigned long)_write_errors, static_cast<int>(_rc_mode));
 	return PX4_OK;
 }
 
