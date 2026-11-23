@@ -2,6 +2,7 @@
 
 #include "dxl_protocol.hpp"
 #include "dxl_rc.hpp"
+#include "dxl_trajectory.hpp"
 
 #include <math.h>
 #include <string.h>
@@ -134,4 +135,76 @@ TEST(DxlRcTest, ModesMapToDirectPositionCommands)
 	angle = 0.25f;
 	EXPECT_FALSE(dxl::angleForMode(dxl::RcMode::UNKNOWN, -pi / 6.0f, pi / 2.0f, angle));
 	EXPECT_EQ(angle, 0.25f);
+}
+
+TEST(DxlTrajectoryTest, StartRequiresValidHomeFeedback)
+{
+	float q_actual[3] {};
+	EXPECT_FALSE(dxl::randomTrajectoryStartReady(false, q_actual));
+	EXPECT_TRUE(dxl::randomTrajectoryStartReady(true, q_actual));
+	EXPECT_FALSE(dxl::randomTrajectoryStartReady(true, q_actual, -0.1f));
+
+	q_actual[1] = 0.151f;
+	EXPECT_FALSE(dxl::randomTrajectoryStartReady(true, q_actual));
+	q_actual[1] = 0.149f;
+	EXPECT_TRUE(dxl::randomTrajectoryStartReady(true, q_actual));
+	q_actual[2] = NAN;
+	EXPECT_FALSE(dxl::randomTrajectoryStartReady(true, q_actual));
+}
+
+TEST(DxlTrajectoryTest, PlaysAt50HzAndHoldsFinalSample)
+{
+	dxl::RandomTrajectory trajectory;
+	float q_target[3] {-1.0f, -1.0f, -1.0f};
+	constexpr uint64_t start = 100000;
+	EXPECT_FALSE(trajectory.update(start, q_target));
+	ASSERT_TRUE(trajectory.start(start));
+	EXPECT_TRUE(trajectory.update(start, q_target));
+	EXPECT_EQ(trajectory.sampleIndex(), 0u);
+
+	for (uint8_t i = 0; i < 3; ++i) {
+		EXPECT_FLOAT_EQ(q_target[i], dxl::RANDOM_TRAJECTORY_Q[0][i]);
+	}
+
+	EXPECT_TRUE(trajectory.update(start + dxl::RANDOM_TRAJECTORY_PERIOD_US - 1, q_target));
+	EXPECT_EQ(trajectory.sampleIndex(), 0u);
+	EXPECT_TRUE(trajectory.update(start + dxl::RANDOM_TRAJECTORY_PERIOD_US, q_target));
+	EXPECT_EQ(trajectory.sampleIndex(), 1u);
+
+	for (uint8_t i = 0; i < 3; ++i) {
+		EXPECT_FLOAT_EQ(q_target[i], dxl::RANDOM_TRAJECTORY_Q[1][i]);
+	}
+
+	EXPECT_FALSE(trajectory.start(start));
+	EXPECT_TRUE(trajectory.update(start + dxl::RANDOM_TRAJECTORY_DURATION_US
+				      - dxl::RANDOM_TRAJECTORY_PERIOD_US, q_target));
+	EXPECT_EQ(trajectory.sampleIndex(), dxl::RANDOM_TRAJECTORY_SAMPLE_COUNT - 2);
+	EXPECT_FALSE(trajectory.update(start + dxl::RANDOM_TRAJECTORY_DURATION_US, q_target));
+	EXPECT_FALSE(trajectory.active());
+	EXPECT_EQ(trajectory.sampleIndex(), dxl::RANDOM_TRAJECTORY_SAMPLE_COUNT - 1);
+
+	for (uint8_t i = 0; i < 3; ++i) {
+		EXPECT_FLOAT_EQ(q_target[i], dxl::RANDOM_TRAJECTORY_Q[dxl::RANDOM_TRAJECTORY_SAMPLE_COUNT - 1][i]);
+	}
+
+	EXPECT_FALSE(trajectory.update(start + dxl::RANDOM_TRAJECTORY_DURATION_US + 1000, q_target));
+	ASSERT_TRUE(trajectory.start(start + dxl::RANDOM_TRAJECTORY_DURATION_US + 1000));
+	EXPECT_EQ(trajectory.sampleIndex(), 0u);
+}
+
+TEST(DxlTrajectoryTest, StopAndClockRollbackAbortPlayback)
+{
+	dxl::RandomTrajectory trajectory;
+	float q_target[3] {};
+	ASSERT_TRUE(trajectory.start(100000));
+	EXPECT_TRUE(trajectory.update(120000, q_target));
+	trajectory.stop();
+	EXPECT_FALSE(trajectory.active());
+	EXPECT_FALSE(trajectory.update(140000, q_target));
+
+	ASSERT_TRUE(trajectory.start(200000));
+	EXPECT_FALSE(trajectory.update(199999, q_target));
+	EXPECT_FALSE(trajectory.active());
+	ASSERT_TRUE(trajectory.start(300000));
+	EXPECT_TRUE(trajectory.update(300000, q_target));
 }

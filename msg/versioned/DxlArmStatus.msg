@@ -8,9 +8,12 @@ uint8 STATE_HOLD = 0
 uint8 STATE_RAISE = 1
 uint8 STATE_CENTER = 2
 uint8 STATE_DOWN = 3
+uint8 STATE_RANDOM = 4
 
 bool torque_initialized # Torque-enable write completed; not a torque register readback
 bool feedback_valid
+bool trajectory_active
+uint16 trajectory_sample # Current fixed random trajectory sample, 0 to 3000 inclusive
 uint8 rc_mode
 uint8 RC_MODE_UNKNOWN = 0
 uint8 RC_MODE_UP = 1

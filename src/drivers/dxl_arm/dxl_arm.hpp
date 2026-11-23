@@ -2,6 +2,7 @@
 
 #include "dxl_protocol.hpp"
 #include "dxl_rc.hpp"
+#include "dxl_trajectory.hpp"
 
 #include <px4_platform_common/atomic.h>
 #include <px4_platform_common/module.h>
@@ -40,6 +41,7 @@ private:
 		RAISE = 2,
 		DOWN = 3,
 		HOLD = 4,
+		RANDOM = 5,
 	};
 
 	bool openPort();
@@ -85,6 +87,8 @@ private:
 	bool _input_rc_seen{false};
 	dxl::RcMode _rc_mode{dxl::RcMode::UNKNOWN};
 	dxl::RcMode _command_mode{dxl::RcMode::UNKNOWN};
+	dxl::RandomTrajectory _random_trajectory;
+	hrt_abstime _next_command{0};
 
 	uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};
 	uORB::Subscription _input_rc_sub{ORB_ID(input_rc)};

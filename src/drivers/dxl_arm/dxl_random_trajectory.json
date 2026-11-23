@@ -1,0 +1,87 @@
+{
+  "activity": {
+    "speed_band": 2,
+    "target_normalized_speed": 0.3
+  },
+  "algorithm": "balanced_v2_with_terminal_quintic_brake",
+  "combined_path_length_m": 5.340295957333335,
+  "control": {
+    "angle_convention": "standard_radians_not_sdf",
+    "brake_duration_s": 2.0,
+    "duration_s": 60.0,
+    "frequency_hz": 50.0,
+    "home_tolerance_rad": 0.15,
+    "joint_order": [
+      "front_id1",
+      "left_rear_id2",
+      "right_rear_id3"
+    ],
+    "period_us": 20000,
+    "random_duration_s": 58.0,
+    "sample_count": 3001
+  },
+  "final_q": [
+    1.5097388654831925,
+    0.1927233778470176,
+    1.0281707422686444
+  ],
+  "final_qd": [
+    -6.8833827526759706e-15,
+    5.551115123125783e-16,
+    0.0
+  ],
+  "final_qdd": [
+    -1.1102230246251565e-14,
+    5.551115123125783e-16,
+    -2.220446049250313e-16
+  ],
+  "geometry": {
+    "joint_margin_rad": 0.03490658503988659,
+    "max_condition": 30.0,
+    "params": {
+      "base_radius": 0.0745,
+      "home_angle_deg": 0.0,
+      "joint_down_limit_deg": 90.0,
+      "joint_up_limit_deg": 30.0,
+      "lower_arm": 0.2,
+      "platform_radius": 0.025,
+      "rod_spacing": 0.036,
+      "upper_arm": 0.1
+    },
+    "singular_margin": 0.03
+  },
+  "geometry_sha256": "6c94d220569f18e7f380b2f5f93f91d29c1942d43bb0645c8eda46a61d3a13c6",
+  "initial_q": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "max_abs_jerk_rad_s3": 32.11896237021683,
+  "max_abs_qd_rad_s": 2.1925285858315116,
+  "max_abs_qdd_rad_s2": 4.907490752442753,
+  "position_bytes": 36012,
+  "position_sha256": "a10c09a9d7bdbe906a81b6acd18a518ff0960729bca018809d656a3204dbc63f",
+  "q_max_rad": [
+    1.5183862110100308,
+    1.5311326674228107,
+    1.5310392676034599
+  ],
+  "q_min_rad": [
+    -0.48593136696711636,
+    -0.43626722402733764,
+    -0.4034612518400248
+  ],
+  "random_motion": {
+    "realized_mean_speed_m_s": 0.08993337222428155,
+    "realized_path_length_m": 5.21613558900833,
+    "segments": 34,
+    "time_dilation": 2.295964125560538
+  },
+  "schema": "dxl_fixed_random_trajectory_v1",
+  "seed": 1,
+  "source_sha256": "f1df8e4dcae723dad01f3cf7ebfb275003d309371c9c387d051590fe87a2cb8d",
+  "workspace": {
+    "cells": 8122,
+    "spacing_m": 0.01
+  }
+}

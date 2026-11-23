@@ -70,6 +70,11 @@ int DxlArm::custom_command(int argc, char *argv[])
 		return PX4_OK;
 	}
 
+	if (strcmp(argv[0], "random") == 0) {
+		instance->_requested_command.store(Command::RANDOM);
+		return PX4_OK;
+	}
+
 	if (strcmp(argv[0], "hold") == 0) {
 		instance->_requested_command.store(Command::HOLD);
 		return PX4_OK;
@@ -88,7 +93,7 @@ int DxlArm::print_usage(const char *reason)
 		R"DESCR_STR(
 ### Description
 Dynamixel Protocol 2.0 driver and joint-space Delta arm motion controller for the 7-Nano TELEM1 port.
-Feedback is published as delta_arm_state in the training joint convention. Starting the module does not enable torque or motion.
+Feedback is published as delta_arm_state in the training joint convention. CH7 down starts the fixed 60 s random trajectory from home.
 )DESCR_STR");
 
 	PRINT_MODULE_USAGE_NAME("dxl_arm", "driver");
@@ -96,7 +101,8 @@ Feedback is published as delta_arm_state in the training joint convention. Start
 	PRINT_MODULE_USAGE_COMMAND_DESCR("center", "Write zero angle directly");
 	PRINT_MODULE_USAGE_COMMAND_DESCR("raise", "Write the configured upward angle directly");
 	PRINT_MODULE_USAGE_COMMAND_DESCR("down", "Write the configured downward angle directly");
-	PRINT_MODULE_USAGE_COMMAND_DESCR("hold", "Keep the current target");
+	PRINT_MODULE_USAGE_COMMAND_DESCR("random", "Play the fixed 60 s trajectory once from home");
+	PRINT_MODULE_USAGE_COMMAND_DESCR("hold", "Stop the trajectory and keep the current target");
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 	return PX4_OK;
 }
@@ -442,9 +448,11 @@ void DxlArm::publishStatus(hrt_abstime timestamp)
 {
 	dxl_arm_status_s status{};
 	status.timestamp = timestamp;
-	status.state = static_cast<uint8_t>(_command_mode);
+	status.state = _random_trajectory.active() ? dxl_arm_status_s::STATE_RANDOM : static_cast<uint8_t>(_command_mode);
 	status.torque_initialized = _torque_ready;
 	status.feedback_valid = _feedback_valid;
+	status.trajectory_active = _random_trajectory.active();
+	status.trajectory_sample = _random_trajectory.sampleIndex();
 	status.rc_mode = static_cast<uint8_t>(_rc_mode);
 	status.feedback_sequence = _feedback_sequence;
 	status.feedback_period_us = _feedback_period_us;
@@ -464,8 +472,18 @@ void DxlArm::publishStatus(hrt_abstime timestamp)
 
 void DxlArm::updateRc(hrt_abstime timestamp)
 {
-	if (_param_rc_channel.get() <= 0) {
+	auto invalidate = [&]() {
+		if (_random_trajectory.active()) {
+			_random_trajectory.stop();
+			_command_mode = dxl::RcMode::UNKNOWN;
+			PX4_WARN("Random trajectory stopped; holding the last target");
+		}
+
 		_rc_mode = dxl::RcMode::UNKNOWN;
+	};
+
+	if (_param_rc_channel.get() <= 0) {
+		invalidate();
 		return;
 	}
 
@@ -475,21 +493,21 @@ void DxlArm::updateRc(hrt_abstime timestamp)
 
 	if (!_input_rc_seen || timestamp - _input_rc.timestamp_last_signal >= 250000
 	    || _input_rc.rc_lost || _input_rc.rc_failsafe) {
-		_rc_mode = dxl::RcMode::UNKNOWN;
+		invalidate();
 		return;
 	}
 
 	const int channel = _param_rc_channel.get();
 
 	if (channel <= 0 || channel > _input_rc.channel_count || channel > input_rc_s::RC_INPUT_MAX_CHANNELS) {
-		_rc_mode = dxl::RcMode::UNKNOWN;
+		invalidate();
 		return;
 	}
 
 	const dxl::RcMode mode = dxl::rcModeFromChannel(_input_rc.values[channel - 1]);
 
 	if (mode == dxl::RcMode::UNKNOWN) {
-		_rc_mode = mode;
+		invalidate();
 		return;
 	}
 
@@ -509,7 +527,7 @@ void DxlArm::updateRc(hrt_abstime timestamp)
 		break;
 
 	case dxl::RcMode::DOWN:
-		requestCommand(Command::DOWN);
+		requestCommand(Command::RANDOM);
 		break;
 
 	case dxl::RcMode::UNKNOWN:
@@ -519,6 +537,32 @@ void DxlArm::updateRc(hrt_abstime timestamp)
 
 bool DxlArm::requestCommand(Command command)
 {
+	if (command == Command::RANDOM) {
+		if (!dxl::randomTrajectoryStartReady(_feedback_valid, _q_actual)) {
+			PX4_WARN("Random trajectory requires valid home feedback; center the arm first");
+			return requestCommand(Command::CENTER);
+		}
+
+		if (!_random_trajectory.start(hrt_absolute_time())) {
+			return false;
+		}
+
+		for (uint8_t i = 0; i < 3; ++i) {
+			_q_target[i] = dxl::RANDOM_TRAJECTORY_Q[0][i];
+		}
+
+		_command_mode = dxl::RcMode::DOWN;
+		_torque_requested = true;
+		_next_command = 0;
+		PX4_INFO("Random trajectory started: 3001 samples at 50 Hz");
+		return true;
+	}
+
+	if (_random_trajectory.active()) {
+		_random_trajectory.stop();
+		PX4_INFO("Random trajectory stopped");
+	}
+
 	if (command == Command::HOLD) {
 		_command_mode = dxl::RcMode::UNKNOWN;
 		_torque_requested = true;
@@ -580,7 +624,6 @@ void DxlArm::run()
 
 	hrt_abstime now = hrt_absolute_time();
 	hrt_abstime next_feedback = now;
-	hrt_abstime next_command = now;
 	hrt_abstime next_status = now;
 
 	while (!should_exit()) {
@@ -599,10 +642,27 @@ void DxlArm::run()
 		}
 
 		processRequests();
+		now = hrt_absolute_time();
 
-		if (_torque_requested && ensureTorque() && now >= next_command) {
+		if (_random_trajectory.active()) {
+			_random_trajectory.update(now, _q_target);
+
+			if (!_random_trajectory.active()) {
+				_command_mode = dxl::RcMode::UNKNOWN;
+				PX4_INFO("Random trajectory complete; holding the final target");
+			}
+		}
+
+		if (_torque_requested && ensureTorque() && now >= _next_command) {
 			writeGoals(_q_target);
-			next_command = hrt_absolute_time() + 1000000 / _param_command_rate.get();
+			const hrt_abstime period = 1000000 / _param_command_rate.get();
+
+			if (_next_command == 0 || now >= _next_command + period) {
+				_next_command = now + period;
+
+			} else {
+				_next_command += period;
+			}
 		}
 
 		if (now >= next_status) {
@@ -618,6 +678,10 @@ void DxlArm::run()
 
 const char *DxlArm::stateName() const
 {
+	if (_random_trajectory.active()) {
+		return "random";
+	}
+
 	switch (_command_mode) {
 	case dxl::RcMode::UNKNOWN: return "hold";
 	case dxl::RcMode::UP: return "raise";
@@ -632,6 +696,7 @@ int DxlArm::print_status()
 {
 	PX4_INFO("state: %s, feedback: %s, torque: %s", stateName(), _feedback_valid ? "valid" : "invalid",
 		 _torque_ready ? "enabled" : "not initialized");
+	PX4_INFO("trajectory sample: %lu", (unsigned long)_random_trajectory.sampleIndex());
 	PX4_INFO("sequence: %lu, period: %lu us, read latency: %lu us", (unsigned long)_feedback_sequence,
 		 (unsigned long)_feedback_period_us, (unsigned long)_read_latency_us);
 	PX4_INFO("read errors: %lu, write errors: %lu, RC mode: %d", (unsigned long)_read_errors,

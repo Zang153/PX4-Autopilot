@@ -7,7 +7,9 @@ px4_add_module(
 	SRCS
 		dxl_arm.cpp
 		dxl_protocol.cpp
+		dxl_random_trajectory.cpp
 		dxl_rc.cpp
+		dxl_trajectory.cpp
 	MODULE_CONFIG
 		module.yaml
 )
@@ -16,5 +18,5 @@ target_compile_features(drivers__dxl_arm PRIVATE cxx_std_17)
 
 px4_add_unit_gtest(
 	SRC DxlArmTest.cpp
-	EXTRA_SRCS dxl_protocol.cpp dxl_rc.cpp
+	EXTRA_SRCS dxl_protocol.cpp dxl_random_trajectory.cpp dxl_rc.cpp dxl_trajectory.cpp
 )
