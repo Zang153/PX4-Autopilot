@@ -137,21 +137,6 @@ TEST(DxlRcTest, ModesMapToDirectPositionCommands)
 	EXPECT_EQ(angle, 0.25f);
 }
 
-TEST(DxlTrajectoryTest, StartRequiresValidHomeFeedback)
-{
-	float q_actual[3] {};
-	EXPECT_FALSE(dxl::randomTrajectoryStartReady(false, q_actual));
-	EXPECT_TRUE(dxl::randomTrajectoryStartReady(true, q_actual));
-	EXPECT_FALSE(dxl::randomTrajectoryStartReady(true, q_actual, -0.1f));
-
-	q_actual[1] = 0.151f;
-	EXPECT_FALSE(dxl::randomTrajectoryStartReady(true, q_actual));
-	q_actual[1] = 0.149f;
-	EXPECT_TRUE(dxl::randomTrajectoryStartReady(true, q_actual));
-	q_actual[2] = NAN;
-	EXPECT_FALSE(dxl::randomTrajectoryStartReady(true, q_actual));
-}
-
 TEST(DxlTrajectoryTest, PlaysAt50HzAndHoldsFinalSample)
 {
 	dxl::RandomTrajectory trajectory;
@@ -207,19 +192,4 @@ TEST(DxlTrajectoryTest, StopAndClockRollbackAbortPlayback)
 	EXPECT_FALSE(trajectory.active());
 	ASSERT_TRUE(trajectory.start(300000));
 	EXPECT_TRUE(trajectory.update(300000, q_target));
-}
-
-TEST(DxlTrajectoryTest, RcAbortRequiresExplicitResetBeforeRestart)
-{
-	dxl::RandomTrajectory trajectory;
-	ASSERT_TRUE(trajectory.start(100000));
-	trajectory.abortPlayback();
-	EXPECT_FALSE(trajectory.active());
-	EXPECT_TRUE(trajectory.restartInhibited());
-	EXPECT_FALSE(trajectory.start(200000));
-
-	trajectory.clearRestartInhibit();
-	EXPECT_FALSE(trajectory.restartInhibited());
-	ASSERT_TRUE(trajectory.start(300000));
-	EXPECT_TRUE(trajectory.active());
 }

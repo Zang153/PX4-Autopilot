@@ -473,12 +473,6 @@ void DxlArm::publishStatus(hrt_abstime timestamp)
 void DxlArm::updateRc(hrt_abstime timestamp)
 {
 	auto invalidate = [&]() {
-		if (_random_trajectory.active()) {
-			_random_trajectory.abortPlayback();
-			_command_mode = dxl::RcMode::UNKNOWN;
-			PX4_WARN("Random trajectory stopped; holding the last target");
-		}
-
 		_rc_mode = dxl::RcMode::UNKNOWN;
 	};
 
@@ -538,15 +532,6 @@ void DxlArm::updateRc(hrt_abstime timestamp)
 bool DxlArm::requestCommand(Command command)
 {
 	if (command == Command::RANDOM) {
-		if (_random_trajectory.restartInhibited()) {
-			return false;
-		}
-
-		if (!dxl::randomTrajectoryStartReady(_feedback_valid, _q_actual)) {
-			PX4_WARN("Random trajectory requires valid home feedback; center the arm first");
-			return false;
-		}
-
 		if (!_random_trajectory.start(hrt_absolute_time())) {
 			return false;
 		}
@@ -561,8 +546,6 @@ bool DxlArm::requestCommand(Command command)
 		PX4_INFO("Random trajectory started: 3001 samples at 50 Hz");
 		return true;
 	}
-
-	_random_trajectory.clearRestartInhibit();
 
 	if (_random_trajectory.active()) {
 		_random_trajectory.stop();

@@ -134,7 +134,6 @@ def build_fixed_trajectory():
             "sample_count": SAMPLE_COUNT,
             "joint_order": ["front_id1", "left_rear_id2", "right_rear_id3"],
             "angle_convention": "standard_radians_not_sdf",
-            "home_tolerance_rad": 0.15,
         },
         "random_motion": {
             "realized_path_length_m": episode.diagnostics["realized_path_length_m"],
@@ -170,7 +169,6 @@ namespace dxl
 inline constexpr uint32_t RANDOM_TRAJECTORY_SAMPLE_COUNT = {control['sample_count']};
 inline constexpr uint32_t RANDOM_TRAJECTORY_PERIOD_US = {control['period_us']};
 inline constexpr uint32_t RANDOM_TRAJECTORY_DURATION_US = {round(control['duration_s'] * 1_000_000)};
-inline constexpr float RANDOM_TRAJECTORY_HOME_TOLERANCE_RAD = {control['home_tolerance_rad']:.2f}f;
 extern const float RANDOM_TRAJECTORY_Q[RANDOM_TRAJECTORY_SAMPLE_COUNT][3];
 }} // namespace dxl
 """

@@ -1,29 +1,11 @@
 #include "dxl_trajectory.hpp"
 
-#include <math.h>
-
 namespace dxl
 {
 
-bool randomTrajectoryStartReady(bool feedback_valid, const float q_actual[3], float tolerance)
-{
-	if (!feedback_valid || q_actual == nullptr || !isfinite(tolerance) || tolerance < 0.0f) {
-		return false;
-	}
-
-	for (uint8_t i = 0; i < 3; ++i) {
-		if (!isfinite(q_actual[i])
-		    || fabsf(q_actual[i] - RANDOM_TRAJECTORY_Q[0][i]) > tolerance) {
-			return false;
-		}
-	}
-
-	return true;
-}
-
 bool RandomTrajectory::start(uint64_t timestamp_us)
 {
-	if (_active || _restart_inhibited) {
+	if (_active) {
 		return false;
 	}
 
