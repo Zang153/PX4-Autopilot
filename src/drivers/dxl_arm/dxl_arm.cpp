@@ -93,7 +93,7 @@ int DxlArm::print_usage(const char *reason)
 		R"DESCR_STR(
 ### Description
 Dynamixel Protocol 2.0 driver and joint-space Delta arm motion controller for the 7-Nano TELEM1 port.
-Feedback is published as delta_arm_state in the training joint convention. CH7 down starts the fixed 60 s random trajectory from home.
+Feedback is published as delta_arm_state in the training joint convention. CH7 up starts the fixed 60 s random trajectory from home.
 )DESCR_STR");
 
 	PRINT_MODULE_USAGE_NAME("dxl_arm", "driver");
@@ -523,11 +523,11 @@ void DxlArm::updateRc(hrt_abstime timestamp)
 		break;
 
 	case dxl::RcMode::UP:
-		requestCommand(Command::RAISE);
+		requestCommand(Command::RANDOM);
 		break;
 
 	case dxl::RcMode::DOWN:
-		requestCommand(Command::RANDOM);
+		requestCommand(Command::DOWN);
 		break;
 
 	case dxl::RcMode::UNKNOWN:
@@ -551,7 +551,7 @@ bool DxlArm::requestCommand(Command command)
 			_q_target[i] = dxl::RANDOM_TRAJECTORY_Q[0][i];
 		}
 
-		_command_mode = dxl::RcMode::DOWN;
+		_command_mode = dxl::RcMode::UP;
 		_torque_requested = true;
 		_next_command = 0;
 		PX4_INFO("Random trajectory started: 3001 samples at 50 Hz");

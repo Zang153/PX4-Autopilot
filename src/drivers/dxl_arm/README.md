@@ -1,6 +1,6 @@
 # 7 Nano Dynamixel 机械臂控制与通信配置
 
-本模块用于 UAV+Delta 项目中的三个 Dynamixel 舵机。`dxl_arm` 在飞控本地完成 Protocol 2.0 通信、实际角度反馈、CH7 上/中档固定位置控制和下档固定随机轨迹播放，并向 `mc_uav_delta` 提供 `delta_arm_state` 观测。
+本模块用于 UAV+Delta 项目中的三个 Dynamixel 舵机。`dxl_arm` 在飞控本地完成 Protocol 2.0 通信、实际角度反馈、CH7 上档固定随机轨迹播放、中档回中和下档固定向下位置控制，并向 `mc_uav_delta` 提供 `delta_arm_state` 观测。
 
 ## 为什么必须关闭 TELEM1 上的串口 MAVLink
 
@@ -71,10 +71,10 @@ PX4 Ethernet MAVLink（实例 2）
 
 1. `rc.mc_apps` 自动启动 `dxl_arm`。
 2. 驱动打开 TELEM1，默认目标设为零位并开启力矩。
-3. 上档和中档直接使用对应固定目标；下档只有在三路反馈有效且机械臂已回零时才启动固定随机轨迹。
+3. 中档直接回中，下档直接写入 `DXL_Q_MAX`；上档只有在三路反馈有效且机械臂已回零时才启动固定随机轨迹。
 4. 按 `DXL_CMD_HZ` 的频率向三个舵机同步写入目标位置，默认 50 Hz。
 
-上电默认回中也是直接写入 2048，不进行平滑运动。固定位置和随机轨迹命令都不检查 `vehicle_status`，也没有解锁限制。若下档时未回零，驱动会提示先回中并执行回中命令；将 SC 先拨到中档等待回零，再拨到下档即可启动。
+上电默认回中也是直接写入 2048，不进行平滑运动。固定位置和随机轨迹命令都不检查 `vehicle_status`，也没有解锁限制。若上档时未回零，驱动会提示先回中并执行回中命令；将 SC 先拨到中档等待回零，再拨到上档即可启动。
 
 三个舵机的实际位置仍按 `DXL_FB_HZ` 读取并发布到 `delta_arm_state`。无效或丢失反馈会将 `feedback_valid` 设为 false，并阻止随机轨迹启动。固定目标模式下，无效反馈不会自动改目标；随机播放期间 RC 失联或输入离开有效档位会停止播放并保持最后一次目标。
 
@@ -115,17 +115,17 @@ DXL_Q_MAX = +90°
 
 | SC 档位 | CH7 输入范围 | 行为 |
 |---|---|---|
-| 上档 | `2000±100`，即 1900～2100 | `DXL_Q_MIN`，默认 `-0.523599 rad`，约 -30°，对应 1707 |
-| 中档 | `1503±100`，即 1403～1603 | 中止随机播放并写入 `0 rad`，对应 2048 |
-| 下档 | `999±100`，即 899～1099 | 从 home 单次播放固定 60 秒随机轨迹 |
+| 上档 | `2000±100`，即 1900～2100 | 从 home 单次播放固定 60 秒随机轨迹 |
+| 中档 | `1503±100`，即 1403～1603 | 中止随机播放并直接写入 `0 rad`，对应 2048 |
+| 下档 | `999±100`，即 899～1099 | 中止随机播放并直接写入 `DXL_Q_MAX`，默认 `+90°`，对应 3072，不做平滑 |
 
 固定轨迹由 `Tools/dxl_arm/generate_fixed_trajectory.py` 生成，使用 Gazebo 真实机械臂几何和 Foundation V1 `balanced_v2` 算法。当前冻结参数为 seed=1、速度档 2、归一化速度 0.30；轨迹由 58 秒随机运动和 2 秒五次多项式制动组成，没有前 4 秒静止段，最终速度和加速度为零。
 
 - 直接按 50 Hz 生成 3001 个三关节位置样本，位置表为 36,012 字节并编译进固件。
 - 样本采用 standard 角度顺序，直接对应 ID 1/2/3，不应用 Gazebo SDF 的换序和符号转换。
 - 播放器按启动后的绝对时间每 20 ms 选择样本，串口延迟不会累计成轨迹时长漂移。
-- 60 秒结束后保持最终位置，不自动循环。离开下档后再拨下才能重新播放。
-- `dxl_arm random` 与 CH7 下档执行同一轨迹；`dxl_arm down` 仍保留原来的 `DXL_Q_MAX` 固定角度命令。
+- 60 秒结束后保持最终位置，不自动循环。离开上档后再拨上才能重新播放。
+- `dxl_arm random` 与 CH7 上档执行同一轨迹；`dxl_arm down` 与 CH7 下档一样直接写入 `DXL_Q_MAX`。
 - `dxl_arm_status` 的 `trajectory_active` 和 `trajectory_sample` 分别显示播放状态和当前样本，`state=4` 表示随机播放中。
 
 ## 为什么当前使用 50 Hz
@@ -167,6 +167,8 @@ CONFIG_LIB_RL_TOOLS=y
 CONFIG_MODULES_MC_UAV_DELTA=y
 ```
 
+为节省内部 Flash，该变体还关闭了固定翼、VTOL 和空速选择模块；RAPTOR、相机、云台和动捕链路保持启用。
+
 实机烧录和动作仍需在部署电脑上验证。
 
 ## 实机检查顺序
@@ -178,9 +180,9 @@ CONFIG_MODULES_MC_UAV_DELTA=y
 5. 确认 `/fmu/in/vehicle_visual_odometry` 持续到达，EKF 的外部视觉位置、海拔和 yaw 融合正常。
 6. 将 SC 放在中档，使用 `dxl_arm status` 和 `listener dxl_arm_status` 检查 `rc_mode=2`、`q_target=0`，并观察实际位置是否回到 2048 附近。
 7. 使用 `listener delta_arm_state` 确认三个弧度值的 ID 顺序、零点和方向。
-8. 将 SC 拨到上档，确认 `rc_mode=1`、目标约为 `-0.523 rad`，实际位置向约 1707 运动；拨回中档应直接下发 2048。
-9. 回零后将 SC 拨到下档，确认 `trajectory_active=true`、`trajectory_sample` 持续增加，实际位置平滑跟随。60 秒后应变为 `trajectory_active=false` 并保持最终目标；下档不再表示固定 3072。
-10. 需要单独测试原固定下位置时，使用 `dxl_arm down`；需要中止时切到中档或上档。调试命令还包括 `dxl_arm raise`、`dxl_arm center`、`dxl_arm random` 和 `dxl_arm hold`。
+8. 将 SC 拨到下档，确认 `rc_mode=3`、目标约为 `1.571 rad`，实际位置向约 3072 运动，不做平滑；拨回中档应直接下发 2048。
+9. 回零后将 SC 拨到上档，确认 `rc_mode=1`、`trajectory_active=true`、`trajectory_sample` 持续增加，实际位置平滑跟随。60 秒后应变为 `trajectory_active=false` 并保持最终目标。
+10. 需要单独测试固定下位置或上位置时，分别使用 `dxl_arm down`、`dxl_arm raise`；需要中止随机播放时切到中档或下档。调试命令还包括 `dxl_arm center`、`dxl_arm random` 和 `dxl_arm hold`。
 
 `dxl_arm stop` 会停止并关闭串口，但不等于舵机力矩已关闭。需要失能时必须有独立的硬件安全措施。
 

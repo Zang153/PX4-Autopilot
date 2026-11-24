@@ -98,7 +98,7 @@ parameters:
             max: 100
             unit: Hz
         DXL_RC_CHANNEL:
-            description: {short: Three-position SC channel for up/center commands and down random playback, 0 disables; default CH7}
+            description: {short: Three-position SC channel for up random playback, center and down direct commands, 0 disables; default CH7}
             type: int32
             default: 7
             min: 0
