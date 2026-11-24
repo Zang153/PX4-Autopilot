@@ -208,3 +208,18 @@ TEST(DxlTrajectoryTest, StopAndClockRollbackAbortPlayback)
 	ASSERT_TRUE(trajectory.start(300000));
 	EXPECT_TRUE(trajectory.update(300000, q_target));
 }
+
+TEST(DxlTrajectoryTest, RcAbortRequiresExplicitResetBeforeRestart)
+{
+	dxl::RandomTrajectory trajectory;
+	ASSERT_TRUE(trajectory.start(100000));
+	trajectory.abortPlayback();
+	EXPECT_FALSE(trajectory.active());
+	EXPECT_TRUE(trajectory.restartInhibited());
+	EXPECT_FALSE(trajectory.start(200000));
+
+	trajectory.clearRestartInhibit();
+	EXPECT_FALSE(trajectory.restartInhibited());
+	ASSERT_TRUE(trajectory.start(300000));
+	EXPECT_TRUE(trajectory.active());
+}

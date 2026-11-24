@@ -23,7 +23,7 @@ bool randomTrajectoryStartReady(bool feedback_valid, const float q_actual[3], fl
 
 bool RandomTrajectory::start(uint64_t timestamp_us)
 {
-	if (_active) {
+	if (_active || _restart_inhibited) {
 		return false;
 	}
 

@@ -4,7 +4,7 @@ parameters:
       definitions:
         DXL_ARM_ENABLE:
             description:
-                short: Start the Dynamixel arm driver and automatic centering at boot
+                short: Start the Dynamixel arm driver and automatic downward positioning at boot
             type: boolean
             default: true
             category: System
