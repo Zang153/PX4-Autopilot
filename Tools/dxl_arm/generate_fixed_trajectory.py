@@ -17,8 +17,8 @@ from delta_motion.workspace import build_workspace
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_DIR = REPOSITORY_ROOT / "src" / "drivers" / "dxl_arm"
 SEED = 1
-SPEED_BAND = 2
-NORMALIZED_SPEED = 0.30
+SPEED_BAND = 3
+NORMALIZED_SPEED = 0.45
 DT_S = 0.02
 RANDOM_DURATION_S = 58.0
 BRAKE_DURATION_S = 2.0
@@ -68,7 +68,7 @@ def build_fixed_trajectory():
         episode.q[-1],
         episode.qd[-1],
         episode.qdd[-1],
-        episode.q[-1] + 0.5 * BRAKE_DURATION_S * episode.qd[-1],
+        episode.q[-1] + 0.125 * BRAKE_DURATION_S * episode.qd[-1],
         np.zeros(3),
         np.zeros(3),
         BRAKE_DURATION_S,
