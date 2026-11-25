@@ -1,0 +1,5 @@
+menuconfig MODULES_DELTA_ARM_FAKE
+	bool "delta_arm_fake"
+	default n
+	---help---
+		Publish valid zero Delta joint angles for policy testing without arm hardware.

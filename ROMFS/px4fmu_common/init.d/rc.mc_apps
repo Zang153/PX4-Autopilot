@@ -57,11 +57,16 @@ then
 	mc_raptor start
 fi
 
-if param compare -s DXL_ARM_ENABLE 1
+if param compare -s DELTA_FAKE_EN 1
 then
-	# Reserve TELEM1 for Dynamixel; Ethernet MAVLink and DDS remain active.
-	param set MAV_0_CONFIG 0
-	dxl_arm start
+	delta_arm_fake start
+else
+	if param compare -s DXL_ARM_ENABLE 1
+	then
+		# Reserve TELEM1 for Dynamixel; Ethernet MAVLink and DDS remain active.
+		param set MAV_0_CONFIG 0
+		dxl_arm start
+	fi
 fi
 
 if param compare -s MC_UAVD_ENABLE 1

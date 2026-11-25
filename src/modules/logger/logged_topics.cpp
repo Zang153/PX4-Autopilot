@@ -234,6 +234,9 @@ void LoggedTopics::add_default_topics()
 
 	// additional control allocation logging
 	add_topic("actuator_motors", 100);
+	add_optional_topic("delta_arm_state");
+	add_optional_topic("uav_delta_input");
+	add_optional_topic("uav_delta_status", 10);
 	add_optional_topic_multi("raptor_timing", 0, 8);
 	add_topic("actuator_servos", 100);
 	add_topic_multi("vehicle_thrust_setpoint", 20, 2);

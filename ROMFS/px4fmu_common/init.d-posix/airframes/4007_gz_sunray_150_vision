@@ -55,7 +55,15 @@ param set-default SIM_GZ_EC_MAX4 1000
 # 1.08 kg takeoff mass with the calibrated motorConstant gives ~0.5 hover.
 param set-default MPC_THR_HOVER 0.5
 # The sim IMU runs at 500 Hz (clean 2 ms under gz-sim8's integer-ms sensor
-# truncation). IMU_GYRO_RATEMAX has no 500 enum entry, so the PX4-side cap
-# stays at the 400 default (the 500 Hz stream passes through), and companion
-# policies must be launched with native_step_ratio=5 instead of auto-read.
+# truncation). IMU_GYRO_RATEMAX has no 500 enum entry, so UAV Delta uses an
+# explicit sample-rate override below.
 param set-default NAV_DLL_ACT 2
+
+if param greater -s DELTA_FAKE_EN -1
+then
+	param set-default DELTA_FAKE_EN 1
+	param set-default MC_UAVD_ENABLE 1
+	param set-default MC_UAVD_GYRO_HZ 500
+	param set-default NAV_DLL_ACT 0
+	param set-default COM_DISARM_LAND -1
+fi

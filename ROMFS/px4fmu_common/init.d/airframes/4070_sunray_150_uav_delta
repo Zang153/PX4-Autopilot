@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# @name Sunray 150 UAV Delta zero-arm test
+#
+# @type Quadrotor x
+# @class Copter
+#
+
+. ${R}etc/init.d/rc.mc_defaults
+
+param set-default DELTA_FAKE_EN 1
+param set-default MC_UAVD_ENABLE 1
+param set-default MC_UAVD_GYRO_HZ 0
+
+param set-default CA_AIRFRAME 0
+param set-default CA_ROTOR_COUNT 4
+
+param set-default CA_ROTOR0_PX 0.065
+param set-default CA_ROTOR0_PY 0.065
+param set-default CA_ROTOR0_KM 0.05
+
+param set-default CA_ROTOR1_PX -0.065
+param set-default CA_ROTOR1_PY -0.065
+param set-default CA_ROTOR1_KM 0.05
+
+param set-default CA_ROTOR2_PX 0.065
+param set-default CA_ROTOR2_PY -0.065
+param set-default CA_ROTOR2_KM -0.05
+
+param set-default CA_ROTOR3_PX -0.065
+param set-default CA_ROTOR3_PY 0.065
+param set-default CA_ROTOR3_KM -0.05
+
+param set-default MPC_THR_HOVER 0.5

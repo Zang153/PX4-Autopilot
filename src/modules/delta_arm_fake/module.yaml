@@ -1,0 +1,12 @@
+module_name: delta_arm_fake
+parameters:
+    - group: Delta Arm Fake
+      definitions:
+        DELTA_FAKE_EN:
+            description:
+                short: Publish zero Delta joint feedback for policy testing
+                long: |
+                    Start a 50 Hz publisher with valid=true and q_actual=[0, 0, 0]. When enabled, the real dxl_arm driver is not started by rc.mc_apps.
+            type: boolean
+            default: false
+            category: System
