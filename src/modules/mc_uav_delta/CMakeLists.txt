@@ -1,5 +1,9 @@
 include(px4_add_library)
 
+get_directory_property(FLAGS COMPILE_OPTIONS)
+list(REMOVE_ITEM FLAGS "-Wcast-align")
+set_directory_properties(PROPERTIES COMPILE_OPTIONS "${FLAGS}")
+
 px4_add_module(
 	MODULE modules__mc_uav_delta
 	MAIN mc_uav_delta
