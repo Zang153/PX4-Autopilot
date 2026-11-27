@@ -128,6 +128,59 @@ DXL_Q_MAX = +90°
 - `dxl_arm random` 与 CH7 上档执行同一轨迹；`dxl_arm down` 与 CH7 下档一样直接写入 `DXL_Q_MAX`。
 - `dxl_arm_status` 的 `trajectory_active` 和 `trajectory_sample` 分别显示播放状态和当前样本，`state=4` 表示随机播放中。
 
+## 在 Gazebo 中观看同一固件轨迹
+
+`Tools/dxl_arm/play_gazebo_trajectory.py` 直接读取编译进固件的 `dxl_random_trajectory.cpp`，将 standard 角度转换为 Gazebo SDF 角度后，以 50 Hz 发布到 PX4 模型的三个原生 `JointPositionController`，不依赖 ROS 2 或 `uav_ws`。
+
+第一个终端启动 PX4 的 Gazebo 世界：
+
+```bash
+export GZ_SIM_RESOURCE_PATH=/home/sysu/PX4-Autopilot/Tools/simulation/gz/models
+gz sim -r -v4 /home/sysu/PX4-Autopilot/Tools/simulation/gz/worlds/mujoco_uav_delta.sdf
+```
+
+第二个终端播放完整 60 秒轨迹：
+
+```bash
+cd /home/sysu/PX4-Autopilot
+PYTHONPATH=Tools/dxl_arm python3 Tools/dxl_arm/play_gazebo_trajectory.py
+```
+
+调试时可用 `--duration 0.5` 只播放前 0.5 秒。该工具验证的是同一轨迹数据和 Gazebo 原生执行器，不经过真实 `dxl_arm` 串口驱动，也不代表 Dynamixel 硬件已经通过验证。
+
+## 完整 PX4 起飞后播放
+
+若需要同时观察传统 PX4 起飞、悬停和机械臂扰动，请采用两阶段启动，避免 `make ... gz_mujoco_uav_delta` 在已有世界中重复生成模型。
+
+第一个终端单独启动 Gazebo 世界：
+
+```bash
+source /home/sysu/PX4-Autopilot/build/px4_sitl_uav_delta/rootfs/gz_env.sh
+gz sim -r -v4 /home/sysu/PX4-Autopilot/Tools/simulation/gz/worlds/mujoco_uav_delta.sdf
+```
+
+第二个终端让 PX4 附加到现有模型：
+
+```bash
+cd /home/sysu/PX4-Autopilot
+PX4_GZ_STANDALONE=1 PX4_GZ_MODEL_NAME=mujoco_uav_delta make px4_sitl_uav_delta gz_mujoco_uav_delta
+```
+
+等待 EKF 初始化完成后执行：
+
+```bash
+build/px4_sitl_uav_delta/bin/px4-commander --instance 0 check
+build/px4_sitl_uav_delta/bin/px4-commander --instance 0 takeoff
+```
+
+确认 `vehicle_local_position.z` 已达到悬停高度后，在第三个终端运行：
+
+```bash
+PYTHONPATH=Tools/dxl_arm python3 Tools/dxl_arm/play_gazebo_trajectory.py
+```
+
+也可用 `HEADLESS=1` 做无界面验证。锁步仿真初始化可能明显慢于墙钟时间，应先确认 `xy_valid`、`z_valid` 和 `heading_good_for_control` 均为真，再执行 takeoff。当前 0.45 加速轨迹可能显著增加抗扰难度，必须同时观察 `vehicle_attitude`、`vehicle_local_position` 和 `vehicle_thrust_setpoint`，不能只根据机械臂动作判断飞行正常。
+
 ## 为什么当前使用 50 Hz
 
 `DXL_CMD_HZ` 和 `DXL_FB_HZ` 默认均为 50 Hz，`DXL_ARM_BAUD` 保持 57600。50 Hz 每 20 ms 写入一次，按当前协议包长度估算：
