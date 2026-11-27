@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# @name Sunray 150 UAV Delta zero-arm test
+# @name Sunray 150 UAV Delta down-90-arm test
 #
 # @type Quadrotor x
 # @class Copter

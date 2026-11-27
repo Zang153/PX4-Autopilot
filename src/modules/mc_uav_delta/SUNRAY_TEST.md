@@ -1,8 +1,8 @@
-# Sunray 150：UAV Delta 零机械臂角测试
+# Sunray 150：UAV Delta 向下 90 度机械臂角测试
 
-本分支用于在没有机械臂的 Sunray 150 上测试原 UAV Delta checkpoint。机载 `delta_arm_fake` 以 50 Hz 发布 `delta_arm_state`，消息满足 `valid=true`、`sequence` 递增、`q_actual=[0,0,0]`，策略本体和四路电机输出不做替换。
+本分支用于在没有机械臂的 Sunray 150 上测试原 UAV Delta checkpoint。机载 `delta_arm_fake` 以 50 Hz 发布 `delta_arm_state`，消息满足 `valid=true`、`sequence` 递增、`q_actual=[pi/2,pi/2,pi/2]`，与真实驱动的 DOWN 角度一致，策略本体和四路电机输出不做替换。
 
-零角度只表示机械臂观测为零，不会消除训练模型中的机械臂质量和惯量。本配置验证机载控制链路以及策略对 Sunray 的适应性，不等价于重新训练一个无机械臂策略。
+固定向下 90 度只表示机械臂观测为该角度，不会模拟训练模型中的机械臂质量和惯量。本配置验证机载控制链路以及策略对 Sunray 的适应性，不等价于重新训练一个无机械臂策略。
 
 ## Mac 获取分支并烧录 7-Nano
 
@@ -32,7 +32,7 @@ ftp put src/modules/mc_uav_delta/blob/policy.tar /fs/microsd/uav_delta/policy.ta
 
 ## 选择机型
 
-在 QGC 中选择 `Sunray 150 UAV Delta zero-arm test`，或在 MAVLink Console 中执行：
+在 QGC 中选择 `Sunray 150 UAV Delta down-90-arm test`，或在 MAVLink Console 中执行：
 
 ```sh
 param set SYS_AUTOSTART 4070
@@ -74,7 +74,7 @@ commander status
 
 确认：
 
-- fake-arm 序号持续增加，三个角度均为零且 `valid=true`；
+- fake-arm 序号持续增加，三个角度均为 `pi/2`（约 1.57080 rad）且 `valid=true`；
 - `uav_delta_status.can_arm=true`，`delta_arm_state_stale=false`；
 - `native_step_count` 对应约 100 Hz 的 GRU 更新；
 - `commander status` 显示 `UAV_DELTA` 对应的外部模式编号；

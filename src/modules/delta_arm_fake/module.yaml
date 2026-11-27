@@ -4,9 +4,9 @@ parameters:
       definitions:
         DELTA_FAKE_EN:
             description:
-                short: Publish zero Delta joint feedback for policy testing
+                short: Publish downward 90-degree Delta joint feedback for policy testing
                 long: |
-                    Start a 50 Hz publisher with valid=true and q_actual=[0, 0, 0]. When enabled, the real dxl_arm driver is not started by rc.mc_apps.
+                    Start a 50 Hz publisher with valid=true and q_actual=[pi/2, pi/2, pi/2]. When enabled, the real dxl_arm driver is not started by rc.mc_apps.
             type: boolean
             default: false
             category: System

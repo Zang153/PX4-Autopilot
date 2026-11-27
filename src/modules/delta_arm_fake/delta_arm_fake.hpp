@@ -13,13 +13,20 @@
 namespace delta_arm_fake
 {
 
-inline delta_arm_state_s zeroState(uint32_t sequence, hrt_abstime timestamp)
+inline constexpr float DOWN_ANGLE_RAD = 1.57079632679489661923f;
+
+inline delta_arm_state_s downState(uint32_t sequence, hrt_abstime timestamp)
 {
 	delta_arm_state_s state{};
 	state.timestamp = timestamp;
 	state.timestamp_sample = timestamp;
 	state.sequence = sequence;
 	state.valid = true;
+
+	for (float &angle : state.q_actual) {
+		angle = DOWN_ANGLE_RAD;
+	}
+
 	return state;
 }
 

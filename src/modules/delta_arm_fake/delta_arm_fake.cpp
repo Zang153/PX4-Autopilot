@@ -25,7 +25,7 @@ void DeltaArmFake::Run()
 	}
 
 	const hrt_abstime now = hrt_absolute_time();
-	_delta_arm_state_pub.publish(zeroState(++_sequence, now));
+	_delta_arm_state_pub.publish(downState(++_sequence, now));
 }
 
 int DeltaArmFake::task_spawn(int argc, char *argv[])
@@ -52,7 +52,7 @@ int DeltaArmFake::task_spawn(int argc, char *argv[])
 
 int DeltaArmFake::print_status()
 {
-	PX4_INFO_RAW("Published zero joint states: %lu\n", (unsigned long)_sequence);
+	PX4_INFO_RAW("Published downward 90-degree joint states: %lu\n", (unsigned long)_sequence);
 	return 0;
 }
 
@@ -70,7 +70,7 @@ int DeltaArmFake::print_usage(const char *reason)
 	PRINT_MODULE_DESCRIPTION(
 		R"DESCR_STR(
 ### Description
-Publish valid zero Delta joint angles for policy testing without arm hardware.
+Publish valid downward 90-degree Delta joint angles for policy testing without arm hardware.
 )DESCR_STR");
 
 	PRINT_MODULE_USAGE_NAME("delta_arm_fake", "test");
